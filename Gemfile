@@ -5,10 +5,10 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in resteze.gemspec
 gemspec
 
-gem "irb"
 gem "debug"
 gem "guard"
 gem "guard-minitest"
+gem "irb"
 gem "minitest"
 gem "minitest-reporters"
 gem "rake"

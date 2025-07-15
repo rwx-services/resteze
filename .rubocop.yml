@@ -1,9 +1,7 @@
-require:
+plugins:
   - rubocop-minitest
   - rubocop-performance
   - rubocop-rake
-
-inherit_from: ../../.rubocop-shared.yml
 
 inherit_mode:
   merge:
@@ -11,25 +9,33 @@ inherit_mode:
 
 Metrics/ParameterLists:
   Exclude:
-    - lib/resty/errors.rb
+    - lib/resteze/errors.rb
 
 Metrics/AbcSize:
   Exclude:
-    - lib/resty/response.rb
+    - lib/resteze/response.rb
 
 Metrics/BlockLength:
   Exclude:
-    - lib/resty.rb
+    - lib/resteze.rb
     - test/**/*
 
 Metrics/ClassLength:
   Exclude:
-    - lib/resty/client.rb
+    - lib/resteze/client.rb
     - test/**/*
 
 Minitest/MultipleAssertions:
   Max: 6
 
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+  ConsistentQuotesInMultiline: true
+
 AllCops:
+  NewCops: enable
   Exclude:
     - 'bin/*'
