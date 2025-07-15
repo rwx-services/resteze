@@ -1,0 +1,2 @@
+--ignore-parent-exclusion
+--fail-level=convention

@@ -6,8 +6,15 @@ source "https://rubygems.org"
 gemspec
 
 gem "irb"
-gem "rake", "~> 13.0"
-
-gem "minitest", "~> 5.16"
-
-gem "rubocop", "~> 1.21"
+gem "debug"
+gem "guard"
+gem "guard-minitest"
+gem "minitest"
+gem "minitest-reporters"
+gem "rake"
+gem "rubocop"
+gem "rubocop-minitest"
+gem "rubocop-performance"
+gem "rubocop-rake"
+gem "simplecov"
+gem "webmock"
