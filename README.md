@@ -1,4 +1,4 @@
-# Resteze
+<img src="assets/resteze.svg" alt="Resteze API Ointment" width="128" style="margin: auto;">
 
 TODO: Delete this and the text below, and describe your gem
 
