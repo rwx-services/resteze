@@ -8,7 +8,6 @@ gemspec
 gem "debug"
 gem "guard"
 gem "guard-minitest"
-gem "irb"
 gem "minitest"
 gem "minitest-reporters"
 gem "rake"

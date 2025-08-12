@@ -7,6 +7,9 @@ inherit_mode:
   merge:
     - Exclude
 
+Layout/LineLength:
+  Max: 125
+
 Metrics/ParameterLists:
   Exclude:
     - lib/resteze/errors.rb
@@ -25,8 +28,14 @@ Metrics/ClassLength:
     - lib/resteze/client.rb
     - test/**/*
 
+Metrics/MethodLength:
+  Max: 15
+
 Minitest/MultipleAssertions:
   Max: 6
+
+Style/Documentation:
+  Enabled: false
 
 Style/FrozenStringLiteralComment:
   Enabled: false
@@ -37,5 +46,6 @@ Style/StringLiterals:
 
 AllCops:
   NewCops: enable
+  TargetRubyVersion: 3.2
   Exclude:
-    - 'bin/*'
+    - "bin/*"

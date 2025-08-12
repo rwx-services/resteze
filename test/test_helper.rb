@@ -6,7 +6,7 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "minitest/autorun"
 require "webmock/minitest"
-require "resty"
+require "resteze"
 require "debug"
 
 require "minitest/reporters"
@@ -15,14 +15,14 @@ Minitest::Reporters.use!
 WebMock.disable_net_connect!
 
 module AcmeApi
-  include Resty
+  include Resteze
 
   class << self
     attr_accessor :api_key
   end
 
   class Widget < ApiResource
-    include Resty::List
+    include Resteze::List
 
     property :id
     property :foo
