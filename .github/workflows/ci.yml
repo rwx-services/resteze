@@ -36,8 +36,8 @@ jobs:
         run: bundle install
       - name: Run tests with coverage
         run: bundle exec rake test
-      - name: Upload coverage to Coveralls
-        run: bundle exec coveralls push coverage/.resultset.json
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
 
   static_analysis:
     runs-on: ubuntu-latest
