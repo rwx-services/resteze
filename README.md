@@ -4,6 +4,7 @@
 
 [![Continuous Integration](https://github.com/rwx-services/resteze/actions/workflows/ci.yml/badge.svg)](https://github.com/rwx-services/resteze/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/resteze.svg)](https://badge.fury.io/rb/resteze)
+[![Coverage Status](https://coveralls.io/repos/github/rwx-services/resteze/badge.svg?branch=main)](https://coveralls.io/github/rwx-services/resteze?branch=main)
 
 ---
 

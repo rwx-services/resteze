@@ -5,8 +5,8 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in resteze.gemspec
 gemspec
 
+gem "coveralls_reborn", require: false
 gem "debug"
-gem 'coveralls_reborn', require: false
 gem "guard"
 gem "guard-minitest"
 gem "minitest"
