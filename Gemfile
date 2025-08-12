@@ -6,6 +6,7 @@ source "https://rubygems.org"
 gemspec
 
 gem "debug"
+gem 'coveralls_reborn', require: false
 gem "guard"
 gem "guard-minitest"
 gem "minitest"

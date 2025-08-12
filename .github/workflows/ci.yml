@@ -10,6 +10,9 @@ on:
 jobs:
   run_tests:
     runs-on: ubuntu-latest
+    env:
+      COVERAGE: true
+      COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,8 +34,10 @@ jobs:
           bundler-cache: true
       - name: Install dependencies
         run: bundle install
-      - name: Run tests
+      - name: Run tests with coverage
         run: bundle exec rake test
+      - name: Upload coverage to Coveralls
+        run: bundle exec coveralls push coverage/.resultset.json
 
   static_analysis:
     runs-on: ubuntu-latest

@@ -1,5 +1,8 @@
 if ENV["COVERAGE"]
   require "simplecov"
+  require 'coveralls'
+
+  SimpleCov.formatter = Coveralls::SimpleCov::Formatter
   SimpleCov.start
 end
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
