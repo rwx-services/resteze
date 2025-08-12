@@ -37,6 +37,7 @@ jobs:
       - name: Run tests with coverage
         run: bundle exec rake test
       - name: Coveralls
+        if: matrix.ruby == '3.4.4'
         uses: coverallsapp/github-action@v2
 
   static_analysis:
