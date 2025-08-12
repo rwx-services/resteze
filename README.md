@@ -2,6 +2,10 @@
   <img src="assets/resteze.svg" alt="Resteze API Ointment" width="128" style="margin: auto;">
 </div>
 
+[![Continuous Integration](https://github.com/rwx-services/resteze/actions/workflows/ci.yml/badge.svg)](https://github.com/rwx-services/resteze/actions/workflows/ci.yml)
+
+---
+
 Resteze is a Ruby library designed to simplify the creation of REST API client gems. It provides a flexible framework for defining API resources, handling requests and responses, managing configuration, and supporting common patterns like listing, saving, and error handling. Built on top of popular Ruby libraries such as Faraday, Hashie, and ActiveSupport, Resteze enables developers to quickly build robust, object-oriented clients for RESTful services, with features for custom resource paths, serialization, and thread-safe client management.
 
 But Resteze isn't just for REST! Its resource-oriented design lets you give any API—SOAP, RPC, GraphQL, or even quirky legacy endpoints—a clean, resourceful feel. You can wrap non-RESTful APIs in familiar objects, organize calls as resource methods, and enjoy the same convenience and clarity, no matter how your backend is structured. Resteze helps you tame any API and make it feel right at home in Ruby.
