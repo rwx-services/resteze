@@ -18,6 +18,7 @@ require "resteze/save"
 require "resteze/object"
 
 # API Classes
+require "resteze/instrumentation"
 require "resteze/client"
 require "resteze/errors"
 require "resteze/list_object"
@@ -79,6 +80,7 @@ module Resteze
     end
 
     # Setup magic constants
+    const_set :INSTRUMENTATION_KEY, name.underscore.tr("/", "_") unless const_defined?("#{self}::INSTRUMENTATION_KEY")
     const_set :Object,      Class.new(Resteze::Object)
     const_set :Client,      Class.new(Resteze::Client)
     const_set :Response,    Class.new(Resteze::Response)
