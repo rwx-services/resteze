@@ -78,6 +78,37 @@ end
 
 You can define additional resources, customize paths, and add methods as needed. Resteze handles requests, responses, and error management for you, so you can focus on your API's business logic.
 
+### Instrumentation
+
+Resteze fires an `ActiveSupport::Notifications` event for every HTTP request, making it easy to track performance metrics in host applications.
+
+The event name is `request.<api_module_key>`, where the key is derived from your module name (e.g. `MyCoolApi` → `"request.my_cool_api"`).
+
+```ruby
+ActiveSupport::Notifications.subscribe("request.my_cool_api") do |event|
+  event.duration            # elapsed time in milliseconds
+  event.payload[:method]    # :get, :post, :put, etc.
+  event.payload[:path]      # "/widgets/123"
+  event.payload[:status]    # 200, 404, etc.
+  event.payload[:request_id] # value of the Request-Id response header
+  event.payload[:api_module] # "MyCoolApi"
+  event.payload[:exception]  # [ExceptionClass, message] if the request raised
+end
+```
+
+The event fires on every request — including those that raise errors — so you can feed `event.duration` directly into a histogram for p95 and other percentile calculations. Because `ActiveSupport::Notifications` short-circuits when there are no subscribers, there is no overhead when instrumentation is not in use.
+
+To override the event name key for a module:
+
+```ruby
+module MyCoolApi
+  include Resteze
+
+  INSTRUMENTATION_KEY = "cool_api"
+end
+# => subscribes to "request.cool_api"
+```
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/rwx-services/resteze.

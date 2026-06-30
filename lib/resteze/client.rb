@@ -1,6 +1,7 @@
 module Resteze
   class Client
     include Resteze::ApiModule
+    prepend Resteze::Instrumentation
 
     def self.user_agent
       [
