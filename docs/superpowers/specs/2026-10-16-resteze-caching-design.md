@@ -75,23 +75,73 @@ breakers do not, and consumers already compose those by overriding
 
 ## 1. Configuration
 
-Two new accessors on the consuming module, alongside `api_base` and `open_timeout`:
+Two new accessors on the consuming module, alongside `api_base` and `open_timeout`.
+
+`configure` is `yield self` (`lib/resteze.rb:10-12`) — an ordinary class method, not a
+definition-time DSL. It can be called from anywhere, at any time, any number of
+times. **Configuration therefore belongs in the host application, separate from the
+module definition**, and a Rails initializer is the expected home:
 
 ```ruby
+# lib/my_api.rb — definition, ships with the client gem
 module MyApi
   include Resteze
-
-  configure do |config|
-    config.cache_store = Rails.cache   # omit → caching disabled entirely
-    config.default_ttl = 60            # Integer seconds or ActiveSupport::Duration
-  end
 end
 ```
 
-`cache_store` accepts any `ActiveSupport::Cache::Store`. When it is `nil`,
-`include Cacheable` is a silent no-op: every request goes to the wire and nothing is
-ever written. This is deliberate — caching requires asking twice, once in config and
-once per resource.
+```ruby
+# config/initializers/my_api.rb — configuration, lives in the host app
+MyApi.configure do |config|
+  config.api_base    = ENV.fetch("MY_API_URL")
+  config.cache_store = Rails.cache   # omit → caching disabled entirely
+  config.default_ttl = 60            # Integer seconds or ActiveSupport::Duration
+end
+```
+
+`Rails.cache` is available here: the `:initialize_cache` bootstrap runs before
+`:load_config_initializers`. (Unrelated caveat worth documenting: if the consuming
+module were defined under `app/` rather than in a gem, referencing it from an
+initializer would autoload during initialization, which Zeitwerk objects to. For a
+gem required via the Gemfile, this does not arise.)
+
+Non-Rails consumers call `MyApi.configure` from wherever they do boot-time setup; and
+any consumer may re-call it later to change configuration at runtime.
+
+### What `cache_store` accepts
+
+Either a store, or something that returns one:
+
+```ruby
+config.cache_store = Rails.cache                  # eager — resolved once
+config.cache_store = -> { Rails.cache }           # lazy — current Rails.cache per request
+config.cache_store = -> { Tenant.current.cache }  # lazy — per-tenant routing
+```
+
+```ruby
+def store
+  configured = api_module.cache_store
+  configured.respond_to?(:call) ? configured.call : configured
+end
+```
+
+The lazy form exists because the eager form captures the *object*, not the reference.
+A test suite that assigns `Rails.cache = ActiveSupport::Cache::MemoryStore.new` in
+setup, or an environment that swaps the cache after boot, would otherwise keep writing
+to a stale store with no visible symptom.
+
+When the resolved store is `nil`, `include Cacheable` is a silent no-op: every request
+goes to the wire and nothing is ever written. This is deliberate — caching requires
+asking twice, once in config and once per resource.
+
+### Configuration is never snapshotted
+
+Because configuration may land after classes are loaded and after requests have been
+served, **nothing in the caching layer may memoize it**. The store is resolved per
+request, not built once per resource class and held. A `Caching::Store` wrapper
+memoized at class-definition time would silently ignore every later `configure` call —
+including the initializer, which by definition runs after the gem's classes are loaded.
+
+This extends the no-memoization rule in §10 from TTLs and keys to the store itself.
 
 Two new module-level hooks follow the existing `default_*(klass)` idiom
 (`default_list_key`, `default_resource_slug`):
@@ -449,6 +499,9 @@ because the base class defines it. Detection means `rescue NotImplementedError`.
 - No memoization of resolved TTLs or keys across requests; `cache_scope` is expected to
   vary per thread in multi-tenant deployments, so caching the key would reintroduce the
   cross-tenant leak the scope exists to prevent.
+- No memoization of the store either (§1). It is resolved per request so that late
+  configuration — a Rails initializer, a runtime `configure` call, a callable
+  `cache_store` — takes effect, and so a per-tenant callable can route per thread.
 
 ## 11. Testing
 
@@ -460,6 +513,7 @@ Each test resets the store.
 |---|---|
 | TTL resolution | Each level of both chains; `cache_for nil` disables; subclass inheritance and override |
 | Opt-in | `include Cacheable` with no store is a no-op; no mixin means no caching; unconfigured store never writes |
+| Configuration | `configure` called after classes load takes effect (the initializer case); a callable `cache_store` is resolved per request, not once; swapping the underlying store mid-suite is observed immediately; re-calling `configure` changes behavior without a reload |
 | Key | Same call hits; differing params miss; differing `cache_scope` miss (tenant isolation); differing `api_base` miss; param order does not affect the key; `objects_to_ids` normalization — `retrieve(widget)` and `retrieve(widget.id)` share a key |
 | Entry | Round-trips status, headers, and body; `parse_body` override honored on rebuild; `cached?` true on hit, false on miss |
 | Method rules | GET cached; POST/PUT/PATCH/DELETE never read or written |
@@ -478,7 +532,9 @@ existing Minitest and RSpec helpers:
 
 ## 12. Documentation
 
-- `docs/CONFIGURATION.md` — `cache_store` and `default_ttl`; the hooks
+- `docs/CONFIGURATION.md` — `cache_store` (both eager and callable forms) and
+  `default_ttl`; the hooks; configuring from a Rails initializer rather than the module
+  definition, which the existing examples in that file conflate
 - `docs/ADVANCED_USAGE.md` — **replace** the two hand-rolled caching recipes, which this
   feature obsoletes
 - `docs/API.md` — `Cacheable`, `cache_for`, the bypass blocks, the expiry methods
