@@ -356,8 +356,16 @@ rewriting it would be more confusing than preserving it.
 Never read, never written — straight to the wire. On success, evict:
 
 1. Exact-key delete of the param-less record key.
-2. Best-effort `delete_matched` on `<ns>/<slug>/<id>:*` and `<ns>/<slug>/<id>/*`, to
-   catch param variants such as `retrieve(id: 42, expand: "owner")`.
+2. Best-effort `Store#delete_prefix` on `<ns>/<slug>/<segment>:` and
+   `<ns>/<slug>/<segment>/`, to catch param variants such as
+   `retrieve(id: 42, expand: "owner")`. Two sweeps, both ending in a delimiter, for the
+   prefix-collision reason in §9.
+
+**Eviction applies only to record writes.** The record segment is derived from the
+request path the same way §4 derives it for keys. When it resolves to `collection` —
+a `POST` creating a new record, since `Save#save_resource_path` returns the collection
+path when `persisted?` is false — nothing is evicted. This follows from the decision
+that writes do not evict cached lists.
 
 **Known compromise.** On Redis, Memory, and File stores, step 2 evicts every variant
 of that record. On Memcached, `delete_matched` raises `NotImplementedError`; the
@@ -440,7 +448,7 @@ MyApi.default_cache_ttl(klass) # overridable hook
 MyApi.default_cache_scope(klass)
 MyApi.uncached      { ... }
 MyApi.refresh_cache { ... }
-MyApi.clear_cache              # delete_matched("my_api/*") — NEVER store.clear
+MyApi.clear_cache              # delete_prefix("my_api/", strict: true) — NEVER store.clear
 ```
 
 `clear_cache` must never call `store.clear`. With `config.cache_store = Rails.cache`,
@@ -457,7 +465,7 @@ Widget.cache_ttl                  # resolved
 Widget.list_cache_ttl             # resolved
 Widget.cache_scope                # overridable
 Widget.expire_cache(id)           # single key + prefix sweep
-Widget.expire_cache_all           # delete_matched("my_api/widget/*")
+Widget.expire_cache_all           # delete_prefix("my_api/widget/", strict: true)
 ```
 
 `cache_for` is backed by `class_attribute` so subclasses inherit and can override.
@@ -483,12 +491,62 @@ path is store-agnostic. Only bulk deletion leaks the backend.
 Capability cannot be feature-detected: every store `respond_to?(:delete_matched)`
 because the base class defines it. Detection means `rescue NotImplementedError`.
 
-`Caching::Store#delete_matched` therefore takes a `strict:` flag:
+`Caching::Store#delete_prefix(prefix, strict:)` therefore takes a `strict:` flag:
 
 - `strict: true` (explicit `expire_cache_all` / `clear_cache`) — rescue and re-raise as
   `CacheError`: `"MemCacheStore does not support delete_matched; use expire_cache(id) or
   configure a store that supports key enumeration"`
 - `strict: false` (implicit post-write sweep) — rescue, log at `debug`, continue
+
+**`NotImplementedError` is not a `StandardError`.** Its ancestry is
+`NotImplementedError < ScriptError < Exception`, so a bare `rescue => e` or
+`rescue StandardError` will **not** catch it. It must be rescued by name. Getting this
+wrong means the Memcached path raises straight through `save`.
+
+### The matcher is not portable either
+
+Worse than the capability gap: the stores that *do* implement `delete_matched` disagree
+about what a matcher is. Verified against `activesupport 8.1.3`:
+
+| Store | `Regexp` matcher | glob `String` matcher |
+|---|---|---|
+| `MemoryStore`, `FileStore` | correct, anchors properly | **silently over-deletes** |
+| `MemoryStore` with `namespace:` | correct | `NoMethodError` |
+| `RedisCacheStore` | `ArgumentError` | correct |
+
+- `memory_store.rb` / `file_store.rb` do `key.match(matcher)`. A `String` is coerced to a
+  **regex source**, so `"my_api/widget/42:*"` means `42` followed by zero-or-more `:` —
+  which also matches `my_api/widget/420:ccc`. Evicting widget 42 silently destroys
+  widget 420. No error is raised.
+- `cache.rb#key_matcher` calls `pattern.source` when the store has a `namespace:`,
+  raising `NoMethodError` on a `String`.
+- `redis_cache_store.rb` raises `ArgumentError, "Only Redis glob strings are supported"`
+  on anything that is not a `String`.
+
+**No single matcher value works everywhere**, so `Store#delete_prefix` dispatches by
+behavior rather than by store class (a class check would miss custom and third-party
+stores, and `RedisCacheStore` may not even be defined):
+
+```ruby
+def sweep(prefix)
+  backend.delete_matched(/\A#{Regexp.escape(prefix)}/)
+rescue ArgumentError          # Redis: "Only Redis glob strings are supported"
+  backend.delete_matched("#{glob_escape(prefix)}*")
+end
+```
+
+Regexp is tried first because it is the correct, anchored form for the stores that
+accept it; the glob fallback is reached only on a store that explicitly rejects a
+Regexp. A `NotImplementedError` from either call propagates to the caller's `strict:`
+handling.
+
+`glob_escape` backslash-escapes Redis glob metacharacters (`*`, `?`, `[`, `]`, `\`) in
+the prefix so a literal metacharacter in a resource slug or record id cannot widen the
+sweep.
+
+**Every sweep prefix must end in a delimiter** (`:` or `/`). `my_api/widget/42` as a
+prefix would match `my_api/widget/420:...`; `my_api/widget/42:` and `my_api/widget/42/`
+do not. This is why §6 performs two sweeps rather than one.
 
 ## 10. Thread safety
 
@@ -520,7 +578,7 @@ Each test resets the store.
 | Eviction | Write evicts the record's GET; param variants evicted on a `delete_matched`-capable store; `NotImplementedError` swallowed on one that is not; lists are not evicted |
 | Bypass | `uncached` skips read and write; `refresh_cache` skips read and writes; nesting; restoration after an exception; `uncached` wins when both active |
 | Errors | A 500 is not cached; a store raising on read degrades to a miss; a store raising on write still returns the response |
-| Bulk expiry | `expire_cache(id)`; `expire_cache_all`; `clear_cache` is scoped and never calls `store.clear`; `CacheError` on a store without enumeration |
+| Bulk expiry | `expire_cache(id)`; `expire_cache_all`; `clear_cache` is scoped and never calls `store.clear`; `CacheError` on a store without enumeration; a sweep for record `42` leaves record `420` intact (the over-deletion trap in §9); a store that rejects Regexp matchers falls back to the glob form |
 | Instrumentation | `cache: :hit` with replayed status; `cache: :miss`; `cache: :bypass`; absent for non-cacheable resources |
 | No wire traffic | WebMock asserts a second GET issues no HTTP request — the load-bearing assertion for the whole feature |
 
