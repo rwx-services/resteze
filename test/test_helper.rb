@@ -53,6 +53,11 @@ module VerbApi
     klass.resource_slug.to_sym
   end
 
+  class TrackResult < Object
+    property :message
+    property :events_processed
+  end
+
   class Campaign < ApiResource
     include List
 
@@ -60,7 +65,9 @@ module VerbApi
     property :name
 
     action :data_series, method: :get
-    action :duplicate,   method: :post, on: :member
+    action :duplicate,   method: :post, on: :member, returns: :self
+    action :featured,    method: :get, returns: :self
+    action :search,      method: :get, returns: :list
   end
 
   class SpecialCampaign < Campaign
@@ -83,11 +90,31 @@ module VerbApi
     action :track, method: :post
     action :export
     action :export_ids, method: :post, path: "export/ids"
+    action :track_typed, method: :post, path: "track", returns: TrackResult
   end
 end
 
 VerbApi.configure do |config|
   config.api_base = "http://verb.example.com/"
+  config.logger = Logger.new(nil)
+end
+
+module WrapApi
+  include Resteze
+
+  def self.default_object_key(_klass)
+    :item
+  end
+
+  class Thing < ApiResource
+    property :id
+
+    action :featured, method: :get, returns: :self
+  end
+end
+
+WrapApi.configure do |config|
+  config.api_base = "http://wrap.example.com/"
   config.logger = Logger.new(nil)
 end
 

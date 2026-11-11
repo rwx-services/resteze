@@ -217,5 +217,66 @@ module Resteze
         refute_respond_to subject, :create
       end
     end
+
+    describe "returns:" do
+      it "builds one resource from a hash with returns: :self" do
+        stub_request(:get, verb_url("/campaigns/featured")).to_return(body: { id: "1", name: "Hot" }.to_json)
+        campaign = VerbApi::Campaign.featured
+
+        assert_kind_of VerbApi::Campaign, campaign
+        assert_equal "Hot", campaign.name
+      end
+
+      it "builds an array of resources from an array with returns: :self" do
+        stub_request(:get, verb_url("/campaigns/featured")).to_return(body: [{ id: "1" }, { id: "2" }].to_json)
+        campaigns = VerbApi::Campaign.featured
+
+        assert_equal %w[1 2], campaigns.map(&:id)
+        assert_kind_of VerbApi::Campaign, campaigns.first
+      end
+
+      it "unwraps object_key for a hash and wraps items for an array" do
+        stub_request(:get, "http://wrap.example.com/things/featured")
+          .to_return({ body: { item: { id: "1" } }.to_json }, { body: [{ id: "2" }, { id: "3" }].to_json })
+
+        assert_equal "1", WrapApi::Thing.featured.id
+        assert_equal %w[2 3], WrapApi::Thing.featured.map(&:id)
+      end
+
+      it "returns a new instance from a member action and leaves the receiver alone" do
+        stub_request(:post, verb_url("/campaigns/duplicate")).to_return(body: { id: "def", name: "copy" }.to_json)
+        original = VerbApi::Campaign.new("abc", values: { name: "orig" })
+        copy = original.duplicate(name: "copy")
+
+        assert_equal "def", copy.id
+        assert_equal "abc", original.id
+        assert_equal "orig", original.name
+        refute_same original, copy
+      end
+
+      it "builds a ListObject with returns: :list using the resource's list_key" do
+        stub_request(:get, verb_url("/campaigns/search")).with(query: { q: "x" })
+                                                         .to_return(body: { campaigns: [{}, {}], page: 0 }.to_json)
+        list = VerbApi::Campaign.search(q: "x")
+
+        assert_kind_of VerbApi::ListObject, list
+        assert_equal 2, list.length
+        assert_equal({ page: 0 }, list.metadata)
+      end
+
+      it "builds the named Object subclass" do
+        stub_request(:post, verb_url("/users/track")).to_return(body: { message: "success", events_processed: 2 }.to_json)
+        result = VerbApi::User.track_typed(events: [])
+
+        assert_kind_of VerbApi::TrackResult, result
+        assert_equal 2, result.events_processed
+      end
+
+      it "returns non-hash, non-array data unchanged for returns: :self" do
+        stub_request(:get, verb_url("/campaigns/featured")).to_return(status: 204, body: "")
+
+        assert_equal "", VerbApi::Campaign.featured
+      end
+    end
   end
 end
