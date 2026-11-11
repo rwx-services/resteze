@@ -51,7 +51,7 @@ module Resteze
     private
 
     def save_action
-      self.class.actions.fetch(persisted? ? :update : :create)
+      self.class.action_for(persisted? ? :update : :create)
     end
   end
 end

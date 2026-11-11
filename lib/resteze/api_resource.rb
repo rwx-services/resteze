@@ -89,7 +89,7 @@ module Resteze
     private
 
     def retrieve_action
-      self.class.actions.fetch(:retrieve)
+      self.class.action_for(:retrieve)
     end
   end
 end

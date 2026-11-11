@@ -25,6 +25,16 @@ module Resteze
         action_names.to_h { |name| [name, resolve_action(name)] }.freeze
       end
 
+      # Resolves one action by name. The built-ins and generated methods go
+      # through this rather than #actions, so a consumer who already defines
+      # a class method named `actions` is unaffected.
+      def action_for(name)
+        name = name.to_sym
+        raise KeyError, "#{self} has no action :#{name}" unless action_names.include?(name)
+
+        resolve_action(name)
+      end
+
       # Override to transform params before an action request is sent.
       def action_params(_name, params)
         params
@@ -36,7 +46,7 @@ module Resteze
       end
 
       def invoke_action(name, params = {}, id: nil)
-        action = actions.fetch(name)
+        action = action_for(name)
         raise_invalid_action_id!(id) if action.member? && id.blank?
 
         params = action_params(name, params)

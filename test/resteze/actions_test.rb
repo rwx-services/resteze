@@ -30,6 +30,18 @@ module Resteze
       action :send, method: :post, as: :deliver
     end
 
+    # A 0.4.0 consumer may already use `actions` as its own class method.
+    class AcmeApi::Workflow < AcmeApi::ApiResource
+      include AcmeApi::List
+      include AcmeApi::Save
+
+      property :id
+
+      def self.actions
+        "consumer-defined"
+      end
+    end
+
     class AcmeApi::Resender < AcmeApi::Sender
       action :send, path: "send_now"
     end
@@ -228,6 +240,19 @@ module Resteze
         subject.action :create, path: "create"
 
         refute_respond_to subject, :create
+      end
+    end
+
+    describe "backward compatibility" do
+      it "does not depend on the public actions method for the built-ins" do
+        workflow = AcmeApi::Workflow.new("1")
+
+        assert_equal "consumer-defined", AcmeApi::Workflow.actions
+        assert_equal "/workflows/1", workflow.retrieve_resource_path
+        assert_equal :get, workflow.retrieve_method
+        assert_equal "/workflows", AcmeApi::Workflow.list_resource_path
+        assert_equal :put, workflow.save_method
+        assert_equal "/workflows/1", workflow.save_resource_path
       end
     end
 

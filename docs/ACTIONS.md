@@ -286,8 +286,10 @@ MyApi::Campaign.actions.fetch(:duplicate).to_h
 #      id_param: :campaign_id, returns: nil, as: :duplicate }
 ```
 
-`actions` is rebuilt on every call and frozen. `action` is always a declaration,
-never a lookup.
+`actions` is rebuilt on every call and frozen. `action_for(:retrieve)` resolves a
+single action and is what `refresh`, `list`, `save` and the generated methods use
+internally, so a resource that already defines its own `actions` class method
+keeps working. `action` is always a declaration, never a lookup.
 
 ## Testing
 
