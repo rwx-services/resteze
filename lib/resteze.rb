@@ -24,6 +24,7 @@ require "resteze/errors"
 require "resteze/list_object"
 require "resteze/response"
 require "resteze/util"
+require "resteze/action"
 
 # Middlewares
 require "resteze/middleware/raise_error"
@@ -58,6 +59,10 @@ module Resteze
 
     def default_api_key(attribute)
       attribute.to_s
+    end
+
+    def default_id_param(klass)
+      :"#{klass.resource_slug.singularize}_id"
     end
   end
 

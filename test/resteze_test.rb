@@ -101,6 +101,13 @@ class RestezeTest < Minitest::Spec
     end
   end
 
+  describe ".default_id_param" do
+    it "should return the singular slug plus _id as a symbol" do
+      assert_equal :widget_id, AcmeApi.default_id_param(AcmeApi::Widget)
+      assert_equal :gizmo_device_id, AcmeApi.default_id_param(AcmeApi::GizmoDevice)
+    end
+  end
+
   it "should support all built-in config properties" do
     assert_config_property(:logger)
     assert_config_property(:api_base)
