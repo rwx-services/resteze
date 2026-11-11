@@ -2,6 +2,7 @@ module Resteze
   module ApiResource
     extend ActiveSupport::Concern
     include Resteze::Request
+    include Resteze::Actions
 
     def initialize(id = nil, values: {})
       super(values)

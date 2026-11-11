@@ -10,6 +10,7 @@ require_relative "resteze/version"
 # API Concerns
 require "resteze/api_module"
 require "resteze/request"
+require "resteze/actions"
 require "resteze/api_resource"
 require "resteze/list"
 require "resteze/save"
