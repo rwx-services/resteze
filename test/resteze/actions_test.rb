@@ -8,6 +8,23 @@ module Resteze
     end
 
     class AcmeApi::Invalid < AcmeApi::ApiResource; end
+
+    class AcmeApi::Doohickey < AcmeApi::ApiResource
+      property :id
+
+      action :activate, method: :post, on: :member
+    end
+
+    class AcmeApi::Hooked < AcmeApi::ApiResource
+      action :ping, method: :post
+
+      def self.action_params(name, params) = params.merge(source: name.to_s)
+      def self.action_headers(_name, _params) = { "X-Action" => "yes" }
+    end
+
+    class AcmeApi::Clash < AcmeApi::ApiResource
+      property :status
+    end
     # rubocop:enable Style/ClassAndModuleChildren
 
     module LateApi
@@ -92,6 +109,112 @@ module Resteze
 
       it "stores nothing when validation fails" do
         assert_empty subject.declared_actions
+      end
+    end
+
+    describe "generated collection actions" do
+      it "posts params as a JSON body and returns a Result" do
+        stub_request(:post, verb_url("/users/track")).to_return(body: { message: "success" }.to_json)
+        result = VerbApi::User.track(events: [{ name: "x" }])
+
+        assert_requested :post, verb_url("/users/track"), body: { events: [{ name: "x" }] }.to_json
+        assert_kind_of VerbApi::Result, result
+        assert_equal "success", result.message
+      end
+
+      it "sends GET params as a query string" do
+        stub_request(:get, verb_url("/campaigns/data_series")).with(query: { length: "7" }).to_return(body: "{}")
+        VerbApi::Campaign.data_series(length: 7)
+
+        assert_requested :get, verb_url("/campaigns/data_series"), query: { length: "7" }
+      end
+
+      it "routes a slashed path" do
+        stub_request(:post, verb_url("/users/export/ids")).to_return(body: "{}")
+        VerbApi::User.export_ids(external_ids: ["1"])
+
+        assert_requested :post, verb_url("/users/export/ids")
+      end
+    end
+
+    describe "generated member actions" do
+      it "merges the id param into the body for :param placement" do
+        stub_request(:post, verb_url("/campaigns/duplicate")).to_return(body: "{}")
+        VerbApi::Campaign.new("abc").duplicate(name: "copy")
+
+        assert_requested :post, verb_url("/campaigns/duplicate"), body: { campaign_id: "abc", name: "copy" }.to_json
+      end
+
+      it "offers a class form that takes the id first" do
+        stub_request(:post, verb_url("/campaigns/duplicate")).to_return(body: "{}")
+        VerbApi::Campaign.duplicate("abc", name: "copy")
+
+        assert_requested :post, verb_url("/campaigns/duplicate"), body: { campaign_id: "abc", name: "copy" }.to_json
+      end
+
+      it "lets a consumer param override the id param" do
+        stub_request(:post, verb_url("/campaigns/duplicate")).to_return(body: "{}")
+        VerbApi::Campaign.new("abc").duplicate(campaign_id: "zzz")
+
+        assert_requested :post, verb_url("/campaigns/duplicate"), body: { campaign_id: "zzz" }.to_json
+      end
+
+      it "puts the id in the path for :path placement" do
+        stub_request(:post, api_url("/doohickeys/1/activate")).to_return(body: "{}")
+        AcmeApi::Doohickey.new("1").activate
+
+        assert_requested :post, api_url("/doohickeys/1/activate"), body: "{}"
+      end
+
+      it "raises InvalidRequestError for a blank id" do
+        assert_raises(VerbApi::InvalidRequestError) { VerbApi::Campaign.new.duplicate(name: "copy") }
+        assert_raises(VerbApi::InvalidRequestError) { VerbApi::Campaign.duplicate("", name: "copy") }
+      end
+    end
+
+    describe "hooks" do
+      it "passes params through action_params and headers through action_headers" do
+        stub_request(:post, api_url("/hookeds/ping")).to_return(body: "{}")
+        AcmeApi::Hooked.ping(a: 1)
+
+        assert_requested :post, api_url("/hookeds/ping"), body: { a: 1, source: "ping" }.to_json,
+                                                          headers: { "X-Action" => "yes" }
+      end
+
+      it "defaults to pass-through and empty headers" do
+        assert_equal({ a: 1 }, AcmeApi::Widget.action_params(:x, { a: 1 }))
+        assert_empty AcmeApi::Widget.action_headers(:x, {})
+      end
+    end
+
+    describe "method-name collisions" do
+      subject { AcmeApi::Clash }
+
+      it "rejects a collection action that collides with a class method" do
+        error = assert_raises(ArgumentError) { subject.action :send, method: :post }
+
+        assert_match(/send/, error.message)
+        assert_match(/as:/, error.message)
+      end
+
+      it "rejects a member action that collides with a Hash method" do
+        assert_raises(ArgumentError) { subject.action :delete, method: :post, on: :member }
+      end
+
+      it "rejects a member action that collides with a property accessor" do
+        assert_raises(ArgumentError) { subject.action :status, method: :get, on: :member }
+      end
+
+      it "accepts as: to pick a different method name" do
+        subject.action :send, method: :post, as: :deliver
+
+        assert_respond_to subject, :deliver
+      end
+
+      it "never generates for reserved names" do
+        subject.action :create, path: "create"
+
+        refute_respond_to subject, :create
       end
     end
   end
