@@ -71,7 +71,7 @@ module Resteze
     end
 
     # TODO: Look at refactoring this if possible to improve the Abc size
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable-next Metrics/AbcSize
     def execute_request(method, path, headers: {}, params: {})
       params = util.objects_to_ids(params)
       body, query_params = process_params(method, params)
@@ -91,7 +91,6 @@ module Resteze
         @last_response = response
       end
     end
-    # rubocop:enable Metrics/AbcSize
 
     protected
 
@@ -202,7 +201,7 @@ module Resteze
     end
 
     # TODO: Look into refactoring to improve Abc Size
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable-next Metrics/AbcSize
     def response_details_in_http_syntax(response)
       status  = response.respond_to?(:status)  ? response.status  : response[:status]
       body    = response.respond_to?(:body)    ? response.body    : response[:body]
@@ -215,7 +214,6 @@ module Resteze
         s << "\n"
       end
     end
-    # rubocop:enable Metrics/AbcSize
 
     def request_in_http_syntax(context)
       method = context.method.to_s.upcase

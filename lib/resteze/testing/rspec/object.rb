@@ -5,7 +5,7 @@ module Resteze
         extend RSpec::Matchers
 
         # rubocop:disable Metrics/AbcSize
-        # rubocop:disable Naming/PredicatePrefix
+        # rubocop:disable-next Naming/PredicatePrefix
         def has_property(name, **options)
           expect(subject.property?(name.to_sym)).to be(true), "Expected #{subject} to have property: #{name}"
           assert_property_default(name, options[:default]) if options.key?(:default)
@@ -13,7 +13,6 @@ module Resteze
           assert_property_transformed(name, transformed: options[:transformed]) if options.key?(:transformed)
           assert_property_required(name, required: options[:required]) if options.key?(:required)
         end
-        # rubocop:enable Naming/PredicatePrefix
 
         def assert_property_transformed(name, transformed: true)
           translation = subject.translations_hash.dig(subject.translations.key(name.to_sym), name.to_sym)
