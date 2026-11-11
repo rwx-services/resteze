@@ -9,3 +9,6 @@
 coverage/
 
 Gemfile.lock
+
+# Design specs and implementation plans are working documents, not part of the gem
+/docs/superpowers/
