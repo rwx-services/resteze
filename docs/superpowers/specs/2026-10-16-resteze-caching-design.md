@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-16
 - **Status:** Approved design, pending implementation plan
-- **Target version:** 0.5.0
+- **Target version:** 0.6.0 (moved from 0.5.0; 0.5.0 is the actions DSL, see 2026-11-11-resteze-actions-design.md)
 
 ## Context and Intent
 
