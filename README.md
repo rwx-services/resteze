@@ -123,6 +123,15 @@ end
 # => subscribes to "request.cool_api"
 ```
 
+## Documentation
+
+- [API](docs/API.md) — core concepts, resource definition, requests and responses
+- [Actions](docs/ACTIONS.md) — the `action` routing DSL for custom and re-routed endpoints
+- [Advanced Usage](docs/ADVANCED_USAGE.md) — lists, saves, pagination, batching and caching patterns
+- [Configuration](docs/CONFIGURATION.md) — module configuration, connections and middleware
+- [Error Handling](docs/ERROR_HANDLING.md) — the namespaced error hierarchy and recovery
+- [Testing](docs/TESTING.md) — Minitest and RSpec helpers, WebMock and VCR
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/rwx-services/resteze.
