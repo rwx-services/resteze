@@ -65,6 +65,35 @@ module Resteze
     def default_id_param(klass)
       :"#{klass.resource_slug.singularize}_id"
     end
+
+    ACTION_DEFAULT_OPTIONS = %i[method id id_param].freeze
+
+    # Declares API-wide defaults for one named action; resources merge these
+    # beneath their own declarations.
+    def action(name, **options)
+      unknown = options.keys - Resteze::Action::OPTIONS
+      raise ArgumentError, "Unknown action option(s): #{unknown.join(', ')}" if unknown.any?
+
+      action_declarations[name.to_sym] = options
+      nil
+    end
+
+    def action_declarations
+      @action_declarations ||= {}
+    end
+
+    # With options, merges them into the API-wide defaults applied to every
+    # action; without options, returns those defaults.
+    def action_defaults(**options)
+      @action_defaults ||= {}
+      return @action_defaults if options.empty?
+
+      unknown = options.keys - ACTION_DEFAULT_OPTIONS
+      raise ArgumentError, "Unknown action default(s): #{unknown.join(', ')}" if unknown.any?
+
+      @action_defaults.merge!(options)
+      nil
+    end
   end
 
   extend ClassMethods
