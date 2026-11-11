@@ -25,6 +25,14 @@ module Resteze
     class AcmeApi::Clash < AcmeApi::ApiResource
       property :status
     end
+
+    class AcmeApi::Sender < AcmeApi::ApiResource
+      action :send, method: :post, as: :deliver
+    end
+
+    class AcmeApi::Resender < AcmeApi::Sender
+      action :send, path: "send_now"
+    end
     # rubocop:enable Style/ClassAndModuleChildren
 
     module LateApi
@@ -105,6 +113,11 @@ module Resteze
 
       it "rejects returns: :list without List" do
         assert_raises(ArgumentError) { subject.action :ping, method: :get, returns: :list }
+      end
+
+      it "rejects unknown on: and id: values" do
+        assert_raises(ArgumentError) { subject.action :ping, method: :get, on: :memberr }
+        assert_raises(ArgumentError) { subject.action :ping, method: :post, on: :member, id: :params }
       end
 
       it "stores nothing when validation fails" do
@@ -215,6 +228,24 @@ module Resteze
         subject.action :create, path: "create"
 
         refute_respond_to subject, :create
+      end
+    end
+
+    describe "subclass redeclaration" do
+      it "keeps the inherited member scope for both call forms" do
+        stub_request(:post, verb_url("/special_campaigns/clone")).to_return(body: "{}")
+        VerbApi::SpecialCampaign.duplicate("1", name: "x")
+        VerbApi::SpecialCampaign.new("2").duplicate(name: "y")
+
+        assert_requested :post, verb_url("/special_campaigns/clone"), body: { special_campaign_id: "1", name: "x" }
+        assert_requested :post, verb_url("/special_campaigns/clone"), body: { special_campaign_id: "2", name: "y" }
+      end
+
+      it "keeps the inherited as: name and never shadows the colliding method" do
+        assert_respond_to AcmeApi::Resender, :deliver
+        assert_equal "AcmeApi::Resender", AcmeApi::Resender.send(:name)
+        assert_equal :deliver, AcmeApi::Resender.actions[:send].generated_name
+        assert_equal "/resenders/send_now", AcmeApi::Resender.actions[:send].path_for
       end
     end
 

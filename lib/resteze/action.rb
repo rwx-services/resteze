@@ -2,8 +2,10 @@ module Resteze
   # A resolved action on a resource class: the HTTP method, route and return
   # type for one named operation such as :retrieve or :track.
   class Action
-    OPTIONS  = %i[method on path id id_param returns as].freeze
-    RESERVED = %i[retrieve list create update].freeze
+    OPTIONS   = %i[method on path id id_param returns as].freeze
+    RESERVED  = %i[retrieve list create update].freeze
+    ON_VALUES = %i[collection member].freeze
+    ID_VALUES = %i[path param].freeze
     BUILT_IN = {
       retrieve: { method: :get, on: :member, path: nil, id: :path },
       list: { method: :get, on: :collection, path: nil },
@@ -12,6 +14,25 @@ module Resteze
     }.freeze
 
     attr_reader :name, :owner, :on, :path, :id, :returns, :as
+
+    # Declaration-time checks shared by the resource DSL and the module-level
+    # DSL: option keys, enumerated values, and the fixed scope of built-ins.
+    def self.validate_options!(name, options, allowed: OPTIONS)
+      unknown = options.keys - allowed
+      raise ArgumentError, "Unknown action option(s): #{unknown.join(', ')}" if unknown.any?
+
+      validate_option_value!(name, options, :on, ON_VALUES)
+      validate_option_value!(name, options, :id, ID_VALUES)
+      return unless RESERVED.include?(name) && options.key?(:on)
+
+      raise ArgumentError, "on: cannot be changed for the built-in action :#{name}"
+    end
+
+    def self.validate_option_value!(name, options, key, values)
+      return unless options.key?(key) && !values.include?(options[key])
+
+      raise ArgumentError, "#{key}: must be one of #{values.inspect} (action :#{name})"
+    end
 
     def initialize(name, owner, options = {})
       @name    = name.to_sym
@@ -27,6 +48,12 @@ module Resteze
 
     def reserved?
       RESERVED.include?(name)
+    end
+
+    # True when a built-in action still has its 0.4.0 REST route, so callers
+    # can keep honoring an instance-level resource_path override.
+    def rest_default?
+      reserved? && path.nil? && (collection? || id == :path)
     end
 
     def member?

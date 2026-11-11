@@ -25,6 +25,11 @@ module Resteze
     end
 
     describe ".parse_body" do
+      it "should return a blank body unparsed regardless of status" do
+        assert_equal "", subject.parse_body("", status: 200)
+        assert_nil subject.parse_body(nil, status: 200, headers: { "content-type" => "application/json" })
+      end
+
       it "should parse JSON if no content-type" do
         assert_equal({ foo: "bar" }, subject.parse_body('{"foo": "bar"}'))
       end

@@ -21,6 +21,17 @@ module Resteze
       end
     end
 
+    # rubocop:disable-next Style/ClassAndModuleChildren
+    class ::AcmeApi::Nested < ::AcmeApi::ApiResource
+      include ::AcmeApi::Save
+
+      property :id
+
+      def resource_path
+        "/accounts/1/nesteds/#{id}"
+      end
+    end
+
     subject { ::AcmeApi::ApiResource }
 
     describe ".service_path" do
@@ -188,6 +199,17 @@ module Resteze
 
       it "keeps instance resource_path meaning the record path" do
         assert_equal "/campaigns/abc", VerbApi::Campaign.new("abc").resource_path
+      end
+    end
+
+    describe "instance resource_path overrides" do
+      it "are still honored by refresh and save when retrieve and update are not re-routed" do
+        stub_request(:get, api_url("/accounts/1/nesteds/7")).to_return(body: { id: "7" }.to_json)
+        ::AcmeApi::Nested.new("7").refresh
+
+        assert_requested :get, api_url("/accounts/1/nesteds/7")
+        assert_equal "/accounts/1/nesteds/7", ::AcmeApi::Nested.new("7").save_resource_path
+        assert_equal "/nesteds", ::AcmeApi::Nested.new.save_resource_path
       end
     end
   end

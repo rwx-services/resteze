@@ -23,7 +23,7 @@ module Resteze
     end
 
     def self.parse_body(body, status: nil, headers: {})
-      return body if unparsable_body?(status:, headers:)
+      return body if body.blank? || unparsable_body?(status:, headers:)
 
       type = mime_type(headers)&.symbol || :json
       case type

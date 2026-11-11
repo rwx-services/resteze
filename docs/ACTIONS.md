@@ -181,9 +181,12 @@ class User < ApiResource
 end
 ```
 
-Declarations are resolved when an action is used, not when it is declared, so
-module-level calls made in a Rails initializer after resource classes are loaded
-still take effect.
+Routing options (`method:`, `path:`, `id:`, `id_param:`, `returns:`) are resolved
+when an action is used, not when it is declared, so module-level calls made in a
+Rails initializer after resource classes are loaded still take effect. The two
+options that shape the generated method, `on:` and `as:`, are read when the
+resource declares the action, so set them at module level before the resource
+classes load, or on the resource itself.
 
 ## Lookup order
 
@@ -228,8 +231,9 @@ class User < ApiResource
 end
 ```
 
-`Result` never raises on body shape. A `204 No Content` or non-JSON body yields
-an empty `Result`; the raw parsed body is always at `result.http_response.data`.
+`Result` never raises on body shape. A `204 No Content`, an empty body, or a
+non-JSON body with a non-JSON content type yields an empty `Result`; the raw
+parsed body is always at `result.http_response.data`.
 
 `:self` on a member action builds a **new** instance and leaves the receiver
 untouched. Mutating the receiver remains the job of `refresh` and `save`.

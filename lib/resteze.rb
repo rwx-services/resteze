@@ -73,10 +73,9 @@ module Resteze
     # Declares API-wide defaults for one named action; resources merge these
     # beneath their own declarations.
     def action(name, **options)
-      unknown = options.keys - Resteze::Action::OPTIONS
-      raise ArgumentError, "Unknown action option(s): #{unknown.join(', ')}" if unknown.any?
-
-      action_declarations[name.to_sym] = options
+      name = name.to_sym
+      Resteze::Action.validate_options!(name, options)
+      action_declarations[name] = options
       nil
     end
 
@@ -90,9 +89,7 @@ module Resteze
       @action_defaults ||= {}
       return @action_defaults if options.empty?
 
-      unknown = options.keys - ACTION_DEFAULT_OPTIONS
-      raise ArgumentError, "Unknown action default(s): #{unknown.join(', ')}" if unknown.any?
-
+      Resteze::Action.validate_options!(:defaults, options, allowed: ACTION_DEFAULT_OPTIONS)
       @action_defaults.merge!(options)
       nil
     end

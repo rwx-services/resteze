@@ -16,8 +16,15 @@ module Resteze
       save_action.http_method
     end
 
+    # While :create / :update keep their REST defaults, an instance-level
+    # resource_path override is honored exactly as in 0.4.0.
     def save_resource_path
-      persisted? ? save_action.path_for(id) : save_action.path_for
+      action = save_action
+      if action.rest_default?
+        persisted? ? resource_path : self.class.resource_path
+      else
+        persisted? ? action.path_for(id) : action.path_for
+      end
     end
 
     def as_save_json

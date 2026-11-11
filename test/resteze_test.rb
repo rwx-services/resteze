@@ -135,6 +135,12 @@ class RestezeTest < Minitest::Spec
       assert_raises(ArgumentError) { Verbish.action_defaults path: "x" }
       assert_raises(ArgumentError) { Verbish.action_defaults on: :member }
     end
+
+    it "rejects on: for reserved names and unknown on:/id: values" do
+      assert_raises(ArgumentError) { Verbish.action :retrieve, on: :collection }
+      assert_raises(ArgumentError) { Verbish.action :ping, on: :memberr }
+      assert_raises(ArgumentError) { Verbish.action_defaults id: :params }
+    end
   end
 
   it "should support all built-in config properties" do

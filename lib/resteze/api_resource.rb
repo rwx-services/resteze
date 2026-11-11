@@ -20,8 +20,12 @@ module Resteze
     end
 
     # The path #refresh requests: the routed :retrieve action. Unlike
-    # #resource_path, this follows re-routing (e.g. /campaigns/details).
+    # #resource_path, this follows re-routing (e.g. /campaigns/details). While
+    # :retrieve keeps its REST default, an instance-level resource_path
+    # override is honored exactly as in 0.4.0.
     def retrieve_resource_path
+      return resource_path if retrieve_action.rest_default?
+
       unless id.present?
         raise api_module::InvalidRequestError.new("Could not determine which PATH to request: #{self.class} instance has " \
                                                   "invalid ID: #{id.inspect}", "id")

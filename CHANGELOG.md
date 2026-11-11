@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 - `retrieve_resource_path`, `save_params` and `id_param` override points.
 - `has_action` assertion helper for Minitest and RSpec.
 
+### Changed
+
+- `Response.parse_body` returns a blank body unparsed instead of raising `JSON::ParserError`, so a `200 OK` with an empty body no longer fails.
+
 ## [0.3.1]
 
 ### Added
