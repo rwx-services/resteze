@@ -51,34 +51,23 @@ products.resteze_metadata[:per_page]
 
 ### Custom List Methods
 
+Additional list-style endpoints are declared with the `action` DSL (see
+[ACTIONS.md](ACTIONS.md)). `returns: :self` builds resources from an array body;
+`returns: :list` builds a `ListObject` using the resource's `list_key`.
+
 ```ruby
 module MyApi
   class Product < ApiResource
     include List
-    
-    # Override list behavior
-    def self.list(filters = {})
-      response = request(:get, resource_path, params: filters)
-      ListObject.new(response.data).tap do |list|
-        list.set_data(response.data[:products])
-        list.set_metadata(response.data.except(:products))
-      end
-    end
-    
-    # Additional list endpoints
-    def self.featured
-      response = request(:get, "#{resource_path}/featured")
-      response.data.map { |attrs| construct_from(attrs) }
-    end
-    
-    def self.search(query, limit: 10)
-      response = request(
-        :get, 
-        "#{resource_path}/search",
-        params: { q: query, limit: limit }
-      )
-      ListObject.new(response.data)
-    end
+
+    # Product.featured => GET /products/featured, an Array of Product
+    action :featured, method: :get, returns: :self
+
+    # Product.search(q: "lamp", limit: 10) => GET /products/search?q=lamp&limit=10, a ListObject
+    action :search, method: :get, returns: :list
+
+    # An API that lists at /products/list instead of /products
+    action :list, path: "list"
   end
 end
 ```

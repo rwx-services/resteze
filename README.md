@@ -78,6 +78,20 @@ end
 
 You can define additional resources, customize paths, and add methods as needed. Resteze handles requests, responses, and error management for you, so you can focus on your API's business logic.
 
+### Actions
+
+Endpoints that do not fit the REST pattern are declared with the `action` DSL, and the built-in `retrieve`, `list`, `create` and `update` can be re-routed the same way. See [docs/ACTIONS.md](docs/ACTIONS.md).
+
+```ruby
+module MyCoolApi
+  class Widget < ApiResource
+    action :search,   method: :get                 # Widget.search(q: "x") => GET /widgets/search?q=x
+    action :activate, method: :post, on: :member   # widget.activate       => POST /widgets/:id/activate
+    action :retrieve, path: "details", id: :param  # Widget.retrieve(id)   => GET /widgets/details?widget_id=...
+  end
+end
+```
+
 ### Instrumentation
 
 Resteze fires an `ActiveSupport::Notifications` event for every HTTP request, making it easy to track performance metrics in host applications.

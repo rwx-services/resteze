@@ -161,6 +161,27 @@ class UserTest < ApiTestCase
 end
 ```
 
+### Testing Actions
+
+`has_action` (from `Resteze::Testing::Minitest::Object` or
+`Resteze::Testing::RSpec::Object`) asserts an action is declared and checks any
+options you pass. `path:` is the full routed path, with the id `"ID"` for member
+actions.
+
+```ruby
+class CampaignTest < Minitest::Spec
+  include Resteze::Testing::Minitest::Object
+
+  subject { TestApi::Campaign }
+
+  it "routes its actions" do
+    has_action :data_series, method: :get, on: :collection, path: "/campaigns/data_series"
+    has_action :duplicate, method: :post, on: :member, id: :param, path: "/campaigns/duplicate"
+    has_action :retrieve, path: "/campaigns/details"
+  end
+end
+```
+
 ### Testing Lists
 
 ```ruby
