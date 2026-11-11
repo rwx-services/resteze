@@ -95,5 +95,30 @@ module Resteze
         assert_equal :put, subject.new(1).save_method
       end
     end
+
+    describe "routed save" do
+      it "uses the create and update actions" do
+        assert_equal :post, VerbApi::ContentBlock.new.save_method
+        assert_equal :post, VerbApi::ContentBlock.new("x").save_method
+        assert_equal "/content_blocks/create", VerbApi::ContentBlock.new.save_resource_path
+        assert_equal "/content_blocks/update", VerbApi::ContentBlock.new("x").save_resource_path
+      end
+
+      it "merges the id param into save_params only when persisted with :param placement" do
+        assert_equal "x", VerbApi::ContentBlock.new("x").save_params["content_block_id"]
+        refute VerbApi::ContentBlock.new.save_params.key?("content_block_id")
+        refute subject.new(1).save_params.key?("toy_id")
+      end
+
+      it "posts the update with the id in the body" do
+        stub_request(:post, verb_url("/content_blocks/update")).to_return(body: { id: "x", content: "new" }.to_json)
+        block = VerbApi::ContentBlock.new("x", values: { content: "new" })
+        block.save
+
+        assert_requested :post, verb_url("/content_blocks/update"),
+                         body: { "content_block_id" => "x", "id" => "x", "content" => "new" }
+        assert_equal "new", block.content
+      end
+    end
   end
 end

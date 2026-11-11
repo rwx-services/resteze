@@ -63,5 +63,19 @@ module Resteze
         assert_equal :get, subject.list_method
       end
     end
+
+    describe "routed list" do
+      it "uses the list action path and method" do
+        assert_equal "/campaigns/list", VerbApi::Campaign.list_resource_path
+        assert_equal :get, VerbApi::Campaign.list_method
+      end
+
+      it "builds the list from the resource's list_key" do
+        stub_request(:get, verb_url("/campaigns/list")).with(query: { page: "0" })
+                                                       .to_return(body: { campaigns: [{}, {}] }.to_json)
+
+        assert_equal 2, VerbApi::Campaign.list(params: { page: 0 }).length
+      end
+    end
   end
 end

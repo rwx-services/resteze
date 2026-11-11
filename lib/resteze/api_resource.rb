@@ -19,12 +19,26 @@ module Resteze
       self.class.resource_path(id)
     end
 
+    # The path #refresh requests: the routed :retrieve action. Unlike
+    # #resource_path, this follows re-routing (e.g. /campaigns/details).
+    def retrieve_resource_path
+      unless id.present?
+        raise api_module::InvalidRequestError.new("Could not determine which PATH to request: #{self.class} instance has " \
+                                                  "invalid ID: #{id.inspect}", "id")
+      end
+
+      retrieve_action.path_for(id)
+    end
+
     def retrieve_method
-      :get
+      retrieve_action.http_method
     end
 
     def retrieve_params
-      @retrieve_params || {}
+      params = @retrieve_params || {}
+      return params unless retrieve_action.id == :param
+
+      { retrieve_action.id_param => id }.merge(params)
     end
 
     def retrieve_headers
@@ -34,7 +48,7 @@ module Resteze
     def refresh
       resp = request(
         retrieve_method,
-        resource_path,
+        retrieve_resource_path,
         params: retrieve_params,
         headers: retrieve_headers
       )
@@ -66,6 +80,12 @@ module Resteze
       def retrieve(id)
         new(id).refresh
       end
+    end
+
+    private
+
+    def retrieve_action
+      self.class.actions.fetch(:retrieve)
     end
   end
 end

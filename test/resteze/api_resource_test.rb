@@ -151,5 +151,44 @@ module Resteze
         assert_empty AcmeApi::YoYoA.new("1").retrieve_headers
       end
     end
+
+    describe "#retrieve_resource_path" do
+      it "matches resource_path for REST defaults" do
+        assert_equal "/toy-service/v3/yo_yos/1", AcmeApi::YoYoA.new("1").retrieve_resource_path
+      end
+
+      it "uses the routed retrieve action" do
+        assert_equal "/campaigns/details", VerbApi::Campaign.new("abc").retrieve_resource_path
+        assert_equal "/content_blocks/info", VerbApi::ContentBlock.new("x").retrieve_resource_path
+      end
+
+      it "rejects a blank id" do
+        assert_raises(VerbApi::InvalidRequestError) { VerbApi::Campaign.new.retrieve_resource_path }
+      end
+    end
+
+    describe "routed retrieve" do
+      it "leaves retrieve_params alone for :path placement" do
+        assert_empty ::AcmeApi::Widget.new("1").retrieve_params
+      end
+
+      it "merges the id param for :param placement, consumer values winning" do
+        assert_equal({ campaign_id: "abc" }, VerbApi::Campaign.new("abc").retrieve_params)
+        assert_equal({ campaign_id: "zzz" }, VerbApi::Campaign.new({ id: "abc", campaign_id: "zzz" }).retrieve_params)
+      end
+
+      it "requests the verb-style path with the id as a query param" do
+        stub_request(:get, verb_url("/campaigns/details")).with(query: { campaign_id: "abc" })
+                                                          .to_return(body: { id: "abc", name: "Hi" }.to_json)
+        campaign = VerbApi::Campaign.retrieve("abc")
+
+        assert_equal "Hi", campaign.name
+        assert_requested :get, verb_url("/campaigns/details"), query: { campaign_id: "abc" }
+      end
+
+      it "keeps instance resource_path meaning the record path" do
+        assert_equal "/campaigns/abc", VerbApi::Campaign.new("abc").resource_path
+      end
+    end
   end
 end
