@@ -23,6 +23,7 @@ require "resteze/client"
 require "resteze/errors"
 require "resteze/list_object"
 require "resteze/response"
+require "resteze/result"
 require "resteze/util"
 require "resteze/action"
 
@@ -89,6 +90,7 @@ module Resteze
     const_set :Object,      Class.new(Resteze::Object)
     const_set :Client,      Class.new(Resteze::Client)
     const_set :Response,    Class.new(Resteze::Response)
+    const_set :Result,      Class.new(Resteze::Result)
     const_set :Error,       Class.new(Resteze::Error)
 
     Resteze::Error.subclasses.select { |klass| klass.name.start_with?("Resteze::") }.each do |error_class|

@@ -185,6 +185,7 @@ class RestezeTest < Minitest::Spec
         Save
         Util
         Response
+        Result
         Error
         InvalidRequestError
         ApiConnectionError
