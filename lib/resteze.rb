@@ -24,6 +24,7 @@ require "resteze/instrumentation"
 require "resteze/client"
 require "resteze/errors"
 require "resteze/list_object"
+require "resteze/rate_limit"
 require "resteze/response"
 require "resteze/result"
 require "resteze/util"
@@ -103,7 +104,8 @@ module Resteze
                     :open_timeout,
                     :read_timeout,
                     :logger,
-                    :proxy
+                    :proxy,
+                    :rate_limit_headers
     end
 
     configure do |config|
@@ -111,6 +113,7 @@ module Resteze
       config.open_timeout = 30
       config.read_timeout = 60
       config.logger = Logger.new($stdout)
+      config.rate_limit_headers = Resteze::RateLimit::DEFAULT_HEADERS
     end
 
     # Setup magic constants

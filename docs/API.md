@@ -223,6 +223,7 @@ response.http_body     # Raw response body
 response.request_id    # Request ID from headers (if present)
 response.success?      # true for any 2xx status
 response.ok?           # true only for 200
+response.rate_limit    # RateLimit (limit, remaining, reset) from the headers, or nil
 ```
 
 For APIs that report failures inside a successful response, override `MyApi::Response.body_error` to return an error to raise; see [Errors Reported in a 2xx Body](ERROR_HANDLING.md#errors-reported-in-a-2xx-body).

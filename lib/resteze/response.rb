@@ -1,5 +1,7 @@
 module Resteze
   class Response
+    include Resteze::ApiModule
+
     OK = 200
     attr_accessor :data, :http_body, :http_headers, :http_status, :request_id
 
@@ -75,6 +77,12 @@ module Resteze
     # Any 2xx status, matching Faraday::Response#success?.
     def success?
       (200..299).cover?(http_status)
+    end
+
+    # Rate-limit state from the response headers named by the module's
+    # `rate_limit_headers`, or nil when the API sent none.
+    def rate_limit
+      @rate_limit ||= RateLimit.from_headers(http_headers, api_module.try(:rate_limit_headers))
     end
   end
 end

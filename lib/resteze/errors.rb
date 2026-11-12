@@ -1,5 +1,7 @@
 module Resteze
   class Error < StandardError
+    include Resteze::ApiModule
+
     attr_accessor :response
     attr_reader   :message, :code, :http_body, :http_headers, :http_status, :json_body
 
@@ -61,7 +63,12 @@ module Resteze
     # Case-insensitive header lookup; http_headers may be a plain Hash or a
     # Faraday::Utils::Headers.
     def header(name)
-      http_headers.find { |key, _| key.to_s.casecmp?(name) }&.last
+      RateLimit.header_value(http_headers, name)
+    end
+
+    # Rate-limit state from the error's headers (see Response#rate_limit).
+    def rate_limit
+      @rate_limit ||= RateLimit.from_headers(http_headers, api_module.try(:rate_limit_headers))
     end
   end
 
@@ -87,7 +94,7 @@ module Resteze
     end
   end
 
-  module RateLimit
+  module RateLimited
     # Seconds to wait before retrying, from the Retry-After header. Accepts
     # delay-seconds or an HTTP-date; nil when absent or unparseable.
     def retry_after
@@ -111,7 +118,7 @@ module Resteze
       AuthenticationError: nil,
       ApiConnectionError: nil,
       ApiError: nil,
-      RateLimitError: RateLimit
+      RateLimitError: RateLimited
     }.freeze
 
     def self.define(namespace, base)

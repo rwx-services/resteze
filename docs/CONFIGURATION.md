@@ -7,6 +7,7 @@
 - [Connection Configuration](#connection-configuration)
 - [Logging Configuration](#logging-configuration)
 - [Proxy Configuration](#proxy-configuration)
+- [Rate Limits](#rate-limits)
 - [Advanced Configuration Patterns](#advanced-configuration-patterns)
 
 ## Basic Configuration
@@ -534,6 +535,73 @@ module MyApi
   end
 end
 ```
+
+## Rate Limits
+
+### Reading rate-limit headers
+
+Every `Response` and every `MyApi::Error` exposes `rate_limit`, built from the response headers. It is `nil` when the API sent none of them.
+
+```ruby
+response = MyApi::User.request(:get, '/users')
+response.rate_limit.limit       # 250000
+response.rate_limit.remaining   # 249990
+response.rate_limit.reset       # as sent by the API: an epoch for Braze and GitHub,
+                                # seconds-until for the IETF RateLimit draft
+response.rate_limit.exhausted?  # remaining == 0
+
+begin
+  MyApi::Event.track(events: batch)
+rescue MyApi::RateLimitError => e
+  e.rate_limit.remaining   # 0
+  e.retry_after            # seconds from the Retry-After header, or nil
+end
+```
+
+The default header names are `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, matched case-insensitively. Configure different names per module; keys you leave out keep their defaults:
+
+```ruby
+module MyApi
+  include Resteze
+
+  configure do |config|
+    config.rate_limit_headers = {
+      limit: 'RateLimit-Limit',
+      remaining: 'RateLimit-Remaining',
+      reset: 'RateLimit-Reset'
+    }
+  end
+end
+```
+
+### Retrying after a 429
+
+Resteze raises `MyApi::RateLimitError` for a 429 and leaves retrying to you. For automatic retries, add the [`faraday-retry`](https://github.com/lostisland/faraday-retry) gem (it is not a Resteze dependency) and place it **after** `RaiseError` in the stack. That puts it closer to the adapter, so it sees the raw 429 and retries before `RaiseError` turns the final answer into an error. `retry_statuses: [429]` makes it honor `Retry-After` automatically.
+
+```ruby
+require 'faraday/retry'
+
+module MyApi
+  class Client < Resteze::Client
+    def self.default_connection
+      Thread.current["#{client_name}_default_connection"] ||= Faraday.new do |conn|
+        conn.use Faraday::Request::UrlEncoded
+        conn.use Middleware::RaiseError
+        conn.request :retry,
+                     max: 3,
+                     interval: 0.5,
+                     backoff_factor: 2,
+                     retry_statuses: [429],
+                     methods: %i[get post]   # POST is not retried by default; add it only
+                                             # where the API treats a 429 as "not processed"
+        conn.adapter Faraday.default_adapter
+      end
+    end
+  end
+end
+```
+
+For an API that signals the wait through a non-standard header, pass `rate_limit_retry_header:` and `rate_limit_reset_header:`, with a `header_parser_block:` to convert the value into seconds. See the faraday-retry README.
 
 ## Advanced Configuration Patterns
 
