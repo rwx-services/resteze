@@ -99,6 +99,19 @@ module Resteze
       end
     end
 
+    describe "destroy built-in" do
+      it "pre-registers destroy as a reserved DELETE member action with no segment" do
+        assert_includes Action::RESERVED, :destroy
+        assert_equal({ method: :delete, on: :member, path: nil, id: :path }, Action::BUILT_IN[:destroy])
+
+        destroy = action(:destroy, **Action::BUILT_IN[:destroy])
+
+        assert_predicate destroy, :rest_default?
+        assert_equal :delete, destroy.http_method
+        assert_equal "/widgets/abc", destroy.path_for("abc")
+      end
+    end
+
     describe "#to_h" do
       it "includes every option plus name" do
         expected = { name: :dup, method: :post, on: :member, path: "dup", id: :param, id_param: :widget_id,
