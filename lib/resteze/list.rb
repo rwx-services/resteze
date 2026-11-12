@@ -28,7 +28,7 @@ module Resteze
       end
 
       def list_resource_path(_params = {})
-        resource_path
+        action_for(:list).path_for
       end
 
       def list_key
@@ -36,7 +36,7 @@ module Resteze
       end
 
       def list_method
-        :get
+        action_for(:list).http_method
       end
     end
   end

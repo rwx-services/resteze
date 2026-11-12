@@ -4,6 +4,9 @@ module Resteze
       module Object
         include ActiveSupport::Concern
 
+        ACTION_READERS = { method: :http_method, on: :on, id: :id, id_param: :id_param,
+                           returns: :returns, as: :generated_name }.freeze
+
         private
 
         # rubocop:disable Metrics/AbcSize
@@ -17,6 +20,33 @@ module Resteze
         end
         # rubocop:enable Metrics/AbcSize
         # rubocop:enable Naming/PredicatePrefix
+
+        # Assert that an action is declared, optionally checking its resolved
+        # options. `path:` is compared against the full routed path, using the
+        # id "ID" for member actions.
+        # rubocop:disable-next Naming/PredicatePrefix
+        def has_action(name, **options)
+          action = subject.actions[name.to_sym]
+
+          assert action, "Expected #{subject} to have action: #{name}"
+          assert_action_options(action, options)
+        end
+
+        def assert_action_options(action, options)
+          ACTION_READERS.each do |option, reader|
+            next unless options.key?(option)
+
+            assert_equal options[option], action.public_send(reader),
+                         "Expected #{subject} action #{action.name} to have #{option}: #{options[option].inspect}"
+          end
+          assert_action_path(action, options[:path]) if options.key?(:path)
+        end
+
+        def assert_action_path(action, path)
+          actual = action.member? ? action.path_for("ID") : action.path_for
+
+          assert_equal path, actual, "Expected #{subject} action #{action.name} to route to #{path}"
+        end
 
         def assert_property_transformed(name, transformed: true)
           translation = subject.translations_hash.dig(subject.translations.key(name.to_sym), name.to_sym)

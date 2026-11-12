@@ -40,6 +40,10 @@ class RestezeTest < Minitest::Spec
     end
   end
 
+  class Verbish
+    include Resteze
+  end
+
   after { reset_gem! }
   subject { AcmeApi }
 
@@ -98,6 +102,44 @@ class RestezeTest < Minitest::Spec
     it "should return the passed in API key as a string" do
       assert_equal "description", AcmeApi.default_api_key("description")
       assert_equal "thing_id", AcmeApi.default_api_key(:thing_id)
+    end
+  end
+
+  describe ".default_id_param" do
+    it "should return the singular slug plus _id as a symbol" do
+      assert_equal :widget_id, AcmeApi.default_id_param(AcmeApi::Widget)
+      assert_equal :gizmo_device_id, AcmeApi.default_id_param(AcmeApi::GizmoDevice)
+    end
+  end
+
+  describe "module-level actions" do
+    it "stores action declarations by name" do
+      Verbish.action :retrieve, path: "details"
+      Verbish.action "track", method: :post
+
+      assert_equal({ path: "details" }, Verbish.action_declarations[:retrieve])
+      assert_equal({ method: :post }, Verbish.action_declarations[:track])
+      assert_empty AcmeApi.action_declarations
+    end
+
+    it "stores and returns action defaults" do
+      assert_empty Verbish.action_defaults
+      Verbish.action_defaults id: :param
+      Verbish.action_defaults method: :post
+
+      assert_equal({ id: :param, method: :post }, Verbish.action_defaults)
+    end
+
+    it "rejects unknown options" do
+      assert_raises(ArgumentError) { Verbish.action :retrieve, verb: :get }
+      assert_raises(ArgumentError) { Verbish.action_defaults path: "x" }
+      assert_raises(ArgumentError) { Verbish.action_defaults on: :member }
+    end
+
+    it "rejects on: for reserved names and unknown on:/id: values" do
+      assert_raises(ArgumentError) { Verbish.action :retrieve, on: :collection }
+      assert_raises(ArgumentError) { Verbish.action :ping, on: :memberr }
+      assert_raises(ArgumentError) { Verbish.action_defaults id: :params }
     end
   end
 
@@ -178,6 +220,7 @@ class RestezeTest < Minitest::Spec
         Save
         Util
         Response
+        Result
         Error
         InvalidRequestError
         ApiConnectionError

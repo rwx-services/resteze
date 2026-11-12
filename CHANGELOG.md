@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0]
+
+### Added
+
+- `action` routing DSL on `ApiResource`: declare custom collection and member actions, re-route `retrieve`, `list`, `create` and `update`, and set API-wide defaults with module-level `action` / `action_defaults`.
+- `Result`, a loose Mash returned by custom actions by default; `returns:` selects a resource, a list, or any `Object` subclass instead.
+- `retrieve_resource_path`, `save_params` and `id_param` override points.
+- `has_action` assertion helper for Minitest and RSpec.
+
+### Changed
+
+- `Response.parse_body` returns a blank body unparsed instead of raising `JSON::ParserError`, so a `200 OK` with an empty body no longer fails.
+- `include Resteze` now defines `MyApi::Result`, so `Result` joins `Object`, `Client`, `Response` and the other reserved constant names inside an API module.
+
+### Fixed
+
+- `assert_config_property` (Minitest and RSpec) now assigns the given value before asserting it reads back, then restores the original. It previously only compared the current value.
+
 ## [0.3.1]
 
 ### Added

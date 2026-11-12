@@ -163,34 +163,23 @@ user.refresh  # Re-fetches from API
 
 ### Custom Request Methods
 
+Declare extra endpoints with the `action` DSL. See [ACTIONS.md](ACTIONS.md) for
+the full option table, re-routing the built-ins, and API-wide defaults.
+
 ```ruby
 module MyApi
   class User < ApiResource
     property :id
     property :email
     property :status
-    
-    # Instance method for custom action
-    def activate!
-      response = request(
-        :post,
-        "#{resource_path}/activate",
-        params: { send_email: true }
-      )
-      initialize_from(response.data)
-    end
-    
-    # Class method for custom endpoint
-    def self.search(query)
-      response = request(
-        :get,
-        "#{resource_path}/search",
-        params: { q: query }
-      )
-      response.data.map { |attrs| construct_from(attrs) }
-    end
-    
-    # Custom headers
+
+    # Member action: user.activate(send_email: true) => POST /users/:id/activate
+    action :activate, method: :post, on: :member, returns: :self
+
+    # Collection action: User.search(q: "jane") => GET /users/search?q=jane
+    action :search, method: :get, returns: :self
+
+    # Anything the DSL does not express is still one request call away
     def update_with_version(version, attributes)
       request(
         :patch,

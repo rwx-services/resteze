@@ -27,6 +27,7 @@ When a module does `include Resteze`, the `included` block in `lib/resteze.rb` f
 - `MyApi::Client` — Faraday-based HTTP client (thread-safe via `Thread.current`)
 - `MyApi::ApiResource` — extends Object with `retrieve`, `resource_path`, `refresh`
 - `MyApi::ListObject` — Hashie::Array subclass for paginated list responses
+- `MyApi::Result` — Hashie::Mash subclass returned by custom actions that declare no `returns:`
 - `MyApi::Middleware::RaiseError` — Faraday middleware for HTTP error handling
 - `MyApi::List`, `MyApi::Save` — mixins consumers include on specific resources
 - `MyApi::Error` and all subclasses — namespaced error hierarchy
@@ -64,6 +65,12 @@ GET/HEAD/DELETE params become query strings; all other methods send a JSON body.
 - **`Resteze::Save`** adds `#save` which issues POST (new) or PUT (persisted) based on `persisted?` (presence of `id`).
 
 Both are opt-in; include them on a resource class when needed.
+
+### Actions: the routing DSL
+
+`Resteze::Actions` (mixed into `ApiResource`) provides a Rails-style `action` DSL. `action :track, method: :post` on a resource generates `Klass.track(**params)`; `on: :member` generates an instance method plus `Klass.name(id, **params)`. Four names are reserved (`retrieve`, `list`, `create`, `update`): they are pre-registered with REST defaults, never generate methods, and can be re-routed by redeclaring them (`action :retrieve, path: "details", id: :param`).
+
+Resolution is lazy. `Klass.actions` rebuilds a frozen hash of `Resteze::Action` value objects on every call by merging, lowest priority first: `Action::BUILT_IN` → the module's `action_defaults` → the module's `action` declarations → ancestor classes' `declared_actions` → the class's own. `refresh`, `list` and `save` consult the registry for their route (`retrieve_resource_path`, `list_resource_path`, `save_resource_path`, `save_params`) but keep their own bodies. Custom actions return `MyApi::Result` (a `Hashie::Mash`) unless `returns:` names `:self`, `:list` or an `Object` subclass. Declaration-time validation lives in `Resteze::Actions::Validation`. See `docs/ACTIONS.md`.
 
 ### Testing helpers
 

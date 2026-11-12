@@ -10,6 +10,8 @@ require_relative "resteze/version"
 # API Concerns
 require "resteze/api_module"
 require "resteze/request"
+require "resteze/actions/validation"
+require "resteze/actions"
 require "resteze/api_resource"
 require "resteze/list"
 require "resteze/save"
@@ -23,7 +25,9 @@ require "resteze/client"
 require "resteze/errors"
 require "resteze/list_object"
 require "resteze/response"
+require "resteze/result"
 require "resteze/util"
+require "resteze/action"
 
 # Middlewares
 require "resteze/middleware/raise_error"
@@ -59,6 +63,36 @@ module Resteze
     def default_api_key(attribute)
       attribute.to_s
     end
+
+    def default_id_param(klass)
+      :"#{klass.resource_slug.singularize}_id"
+    end
+
+    ACTION_DEFAULT_OPTIONS = %i[method id id_param].freeze
+
+    # Declares API-wide defaults for one named action; resources merge these
+    # beneath their own declarations.
+    def action(name, **options)
+      name = name.to_sym
+      Resteze::Action.validate_options!(name, options)
+      action_declarations[name] = options
+      nil
+    end
+
+    def action_declarations
+      @action_declarations ||= {}
+    end
+
+    # With options, merges them into the API-wide defaults applied to every
+    # action; without options, returns those defaults.
+    def action_defaults(**options)
+      @action_defaults ||= {}
+      return @action_defaults if options.empty?
+
+      Resteze::Action.validate_options!(:defaults, options, allowed: ACTION_DEFAULT_OPTIONS)
+      @action_defaults.merge!(options)
+      nil
+    end
   end
 
   extend ClassMethods
@@ -84,6 +118,7 @@ module Resteze
     const_set :Object,      Class.new(Resteze::Object)
     const_set :Client,      Class.new(Resteze::Client)
     const_set :Response,    Class.new(Resteze::Response)
+    const_set :Result,      Class.new(Resteze::Result)
     const_set :Error,       Class.new(Resteze::Error)
 
     Resteze::Error.subclasses.select { |klass| klass.name.start_with?("Resteze::") }.each do |error_class|
