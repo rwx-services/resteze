@@ -110,7 +110,7 @@ ActiveSupport::Notifications.subscribe("request.my_cool_api") do |event|
 end
 ```
 
-The event fires on every request — including those that raise errors — so you can feed `event.duration` directly into a histogram for p95 and other percentile calculations. Because `ActiveSupport::Notifications` short-circuits when there are no subscribers, there is no overhead when instrumentation is not in use.
+The event fires on every request — including those that raise errors — so you can feed `event.duration` directly into a histogram for p95 and other percentile calculations. When a request raises an error that carries an HTTP response (a `Faraday::Error` or a `Resteze::Error` built with `http_status:`), `status` and `request_id` are populated from that response, so a 404 or 429 is bucketed just like a 200. Connection failures and timeouts have no status and leave those keys unset. Because `ActiveSupport::Notifications` short-circuits when there are no subscribers, there is no overhead when instrumentation is not in use.
 
 To override the event name key for a module:
 
