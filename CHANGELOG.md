@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - `action` routing DSL on `ApiResource`: declare custom collection and member actions, re-route `retrieve`, `list`, `create` and `update`, and set API-wide defaults with module-level `action` / `action_defaults`.
 - `Result`, a loose Mash returned by custom actions by default; `returns:` selects a resource, a list, or any `Object` subclass instead.
+- `destroy` built-in action (DELETE, member, id in the path) and the opt-in `Destroy` mixin, which adds `#destroy` and `.destroy(id)` returning a `Result` via `process_destroy_response`.
 - `retrieve_resource_path`, `save_params` and `id_param` override points.
 - `has_action` assertion helper for Minitest and RSpec.
 

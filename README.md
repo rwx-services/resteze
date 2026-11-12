@@ -92,6 +92,8 @@ module MyCoolApi
 end
 ```
 
+Deleting is opt-in like `List` and `Save`: `include Destroy` adds `widget.destroy` and `Widget.destroy(id)`, routed by the built-in `destroy` action (`DELETE /widgets/:id` unless re-routed).
+
 ### Instrumentation
 
 Resteze fires an `ActiveSupport::Notifications` event for every HTTP request, making it easy to track performance metrics in host applications.

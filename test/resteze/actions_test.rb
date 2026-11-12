@@ -58,10 +58,10 @@ module Resteze
     end
 
     describe ".actions" do
-      it "exposes the four built-ins with REST defaults when nothing is declared" do
+      it "exposes the five built-ins with REST defaults when nothing is declared" do
         actions = AcmeApi::Widget.actions
 
-        assert_equal %i[create list retrieve update], actions.keys.sort
+        assert_equal %i[create destroy list retrieve update], actions.keys.sort
         assert_predicate actions, :frozen?
         assert_equal :get, actions[:retrieve].http_method
         assert_equal :path, actions[:retrieve].id
