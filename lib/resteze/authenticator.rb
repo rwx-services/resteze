@@ -162,3 +162,4 @@ end
 require "resteze/authenticator/strategy"
 require "resteze/authenticator/api_key"
 require "resteze/authenticator/basic"
+require "resteze/authenticator/bearer"
