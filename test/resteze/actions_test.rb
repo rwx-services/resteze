@@ -26,6 +26,10 @@ module Resteze
       property :status
     end
 
+    class AcmeApi::Odd < AcmeApi::ApiResource
+      action :weird, method: :get, returns: :bogus
+    end
+
     class AcmeApi::Sender < AcmeApi::ApiResource
       action :send, method: :post, as: :deliver
     end
@@ -332,6 +336,13 @@ module Resteze
         stub_request(:get, verb_url("/campaigns/featured")).to_return(status: 204, body: "")
 
         assert_equal "", VerbApi::Campaign.featured
+      end
+
+      it "raises for an unsupported returns: value" do
+        stub_request(:get, api_url("/odds/weird")).to_return(body: "{}")
+
+        error = assert_raises(ArgumentError) { AcmeApi::Odd.weird }
+        assert_match(/Unsupported returns: :bogus/, error.message)
       end
     end
   end
