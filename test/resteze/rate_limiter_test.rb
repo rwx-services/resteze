@@ -215,6 +215,68 @@ module Resteze
         assert_requested :get, URL, times: 1 # the fixture's retry? would have said yes; refusals never retry
       end
 
+      it "instruments a throttle wait with its seconds and reason" do
+        now = Time.now.to_f
+        sleeper = ->(seconds) { now += seconds }
+        BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) { strategy :fixed_window, limit: 1, window: 30 }
+                                    .new(clock: -> { now }, sleeper:)
+        stub_request(:get, URL).to_return(body: SUCCESS)
+
+        events = capture_events("rate_limit.wait.body_api") do
+          2.times { BodyApi::Client.new.execute_request(:get, "/users/1") }
+        end
+
+        assert_equal 1, events.size
+        payload = events.first.payload
+
+        assert_equal "BodyApi", payload[:api_module]
+        assert_equal :throttle, payload[:reason]
+        assert_equal :sleep,    payload[:on_wait]
+        assert_in_delta 30, payload[:seconds], 1
+        assert_nil payload[:attempt]
+      end
+
+      it "instruments a retry wait with the attempt, and a raised wait with its exception" do
+        BodyApi.rate_limiter = BodyApi::RateLimiter.new(sleeper: ->(_) {})
+        stub_request(:get, URL).to_return(status: 429, headers: { "Retry-After" => "3" }).then.to_return(body: SUCCESS)
+
+        events = capture_events("rate_limit.wait.body_api") { BodyApi::Client.new.execute_request(:get, "/users/1") }
+
+        assert_equal([[:retry, 1, 3.0]], events.map { |e| e.payload.values_at(:reason, :attempt, :seconds) })
+        assert_nil events.first.payload[:exception]
+
+        BodyApi.rate_limiter = BodyApi::RateLimiter.new(on_wait: :raise)
+        stub_request(:get, URL).to_return(status: 429, headers: { "Retry-After" => "3" })
+
+        events = capture_events("rate_limit.wait.body_api") do
+          assert_raises(BodyApi::RateLimitError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
+        end
+
+        assert_equal :raise, events.first.payload[:on_wait]
+        assert_equal "BodyApi::RateLimitError", events.first.payload[:exception].first
+      end
+
+      it "adds the limiter's rate_limit view to the request event, on success and on error" do
+        stub_request(:get, URL).to_return(body: SUCCESS, headers: HEADERS)
+                               .then.to_return(status: 503, headers: HEADERS.merge("X-RateLimit-Remaining" => "1"))
+
+        events = capture_events("request.body_api") do
+          BodyApi::Client.new.execute_request(:get, "/users/1")
+          assert_raises(BodyApi::ApiError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
+        end
+
+        assert_equal([42, 1], events.map { |e| e.payload.dig(:rate_limit, :remaining) })
+        assert_equal 100, events.first.payload[:rate_limit][:limit]
+      end
+
+      it "leaves rate_limit off the request event when the limiter reports none" do
+        stub_request(:get, api_url("/widgets/1")).to_return(body: "{}", headers: HEADERS)
+
+        events = capture_events("request.acme_api") { AcmeApi::Client.new.execute_request(:get, "/widgets/1") }
+
+        refute events.first.payload.key?(:rate_limit)
+      end
+
       it "lets before_request refuse a request before it is sent" do
         BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) do
           def before_request(*, **)

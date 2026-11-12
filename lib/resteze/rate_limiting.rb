@@ -22,7 +22,7 @@ module Resteze
         raise unless e.is_a?(api_module::RateLimitError) && limiter.retry?(e, attempt += 1)
 
         sent = false
-        limiter.wait(limiter.retry_after(e), error: e) # under on_wait: :raise this raises the 429 itself
+        limiter.wait(limiter.retry_after(e), error: e, reason: :retry, attempt:) # :raise raises the 429 itself
         retry
       end
     end
