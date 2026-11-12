@@ -70,6 +70,70 @@ module Resteze
         assert_equal 1, events.size
         refute_nil events.first.payload[:exception]
       end
+
+      it "populates status from a namespaced error response" do
+        stub_request(:get, api_url("/widgets/missing")).to_return(status: 404, headers: { "Request-Id" => "req_404" })
+
+        events = capture_events("request.acme_api") do
+          assert_raises(AcmeApi::ResourceNotFound) do
+            subject.execute_request(:get, "/widgets/missing")
+          end
+        end
+
+        payload = events.first.payload
+
+        assert_equal 404,       payload[:status]
+        assert_equal "req_404", payload[:request_id]
+      end
+
+      it "populates status and request_id from a Faraday error response" do
+        stub_request(:get, api_url("/widgets/limited"))
+          .to_return(status: 429, headers: { "Request-Id" => "req_429" })
+
+        events = capture_events("request.acme_api") do
+          assert_raises(Faraday::TooManyRequestsError) do
+            subject.execute_request(:get, "/widgets/limited")
+          end
+        end
+
+        payload = events.first.payload
+
+        assert_equal 429,       payload[:status]
+        assert_equal "req_429", payload[:request_id]
+        refute_nil payload[:exception]
+      end
+
+      it "populates status and request_id from a Resteze error response" do
+        error = AcmeApi::ApiError.new("boom", http_status: 503, http_headers: { "Request-Id" => "req_503" })
+        stub_request(:get, api_url("/widgets/broken")).to_raise(error)
+
+        events = capture_events("request.acme_api") do
+          assert_raises(AcmeApi::ApiError) do
+            subject.execute_request(:get, "/widgets/broken")
+          end
+        end
+
+        payload = events.first.payload
+
+        assert_equal 503,       payload[:status]
+        assert_equal "req_503", payload[:request_id]
+      end
+
+      it "leaves status unset when the error carries no response" do
+        stub_request(:get, api_url("/widgets/down")).to_raise(Errno::ECONNREFUSED)
+
+        events = capture_events("request.acme_api") do
+          assert_raises(Faraday::ConnectionFailed) do
+            subject.execute_request(:get, "/widgets/down")
+          end
+        end
+
+        payload = events.first.payload
+
+        refute payload.key?(:status)
+        refute payload.key?(:request_id)
+        refute_nil payload[:exception]
+      end
     end
   end
 end

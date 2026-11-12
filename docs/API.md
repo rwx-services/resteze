@@ -217,10 +217,12 @@ response = MyApi::User.request(:get, '/users')
 
 # Access response data
 response.data          # Parsed response body
-response.status        # HTTP status code
-response.headers       # Response headers
-response.body          # Raw response body
+response.http_status   # HTTP status code
+response.http_headers  # Response headers
+response.http_body     # Raw response body
 response.request_id    # Request ID from headers (if present)
+response.success?      # true for any 2xx status
+response.ok?           # true only for 200
 ```
 
 ### Working with Objects

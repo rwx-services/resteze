@@ -45,8 +45,14 @@ module Resteze
       Mime::LOOKUP[mime_type] || Mime::Type.lookup_by_extension(:json)
     end
 
+    # Exactly 200 OK. Use #success? for the whole 2xx range.
     def ok?
       http_status == OK
+    end
+
+    # Any 2xx status, matching Faraday::Response#success?.
+    def success?
+      (200..299).cover?(http_status)
     end
   end
 end

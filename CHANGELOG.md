@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - `Result`, a loose Mash returned by custom actions by default; `returns:` selects a resource, a list, or any `Object` subclass instead.
 - `retrieve_resource_path`, `save_params` and `id_param` override points.
 - `has_action` assertion helper for Minitest and RSpec.
+- `Response#success?`, true for any 2xx status. `Response#ok?` is unchanged and means exactly 200, so a `201 Created` answers `success?` but not `ok?`.
 
 ### Changed
 
@@ -19,6 +20,8 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - `assert_config_property` (Minitest and RSpec) now assigns the given value before asserting it reads back, then restores the original. It previously only compared the current value.
+- The `request.<key>` instrumentation payload now includes `status` and `request_id` when the request raises an error that carries an HTTP response. Previously both were missing for every 4xx and 5xx.
+- `MyApi::ResourceNotFound`, `MyApi::UnprocessableEntityError` and `MyApi::ConflictError` now keep the Faraday response (`e.response`, `e.response_status`, `e.response_body`). The middleware previously dropped it when re-raising under the namespaced class.
 
 ## [0.3.1]
 
