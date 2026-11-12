@@ -1,16 +1,19 @@
 module Resteze
   class Authenticator
-    # A token in the Authorization header, "Bearer <token>" by default.
-    # Use `scheme:` for APIs that want another prefix, such as "Token".
-    # A token the application obtained some other way fits here through a
-    # callable.
+    # A token in the Authorization header, "Bearer <token>" by default,
+    # read from `MyApi.api_key` unless `token:` names another setting. Use
+    # `scheme:` for APIs that want another prefix, such as "Token". A token
+    # the application obtained some other way fits here through a callable.
     #
-    #   strategy :bearer, token: -> { MyApi.api_key }
-    #   strategy :bearer, token: -> { TokenStore.current }, scheme: "Token"
+    #   authenticate_with :bearer                                   # Bearer <MyApi.api_key>
+    #   authenticate_with :bearer, token: :access_token, scheme: "Token"
+    #   authenticate_with :bearer, token: -> { TokenStore.current }
     class Bearer < Strategy
+      DEFAULTS = { token: :api_key }.freeze
+
       attr_reader :scheme
 
-      def initialize(token:, scheme: "Bearer")
+      def initialize(token: :api_key, scheme: "Bearer")
         super()
         @token  = Strategy.required!(:token, token)
         @scheme = scheme

@@ -50,10 +50,10 @@ require 'resteze'
 module MyCoolApi
   include Resteze
 
-  # Settings your API needs beyond the built-in ones
-  class << self
-    attr_accessor :api_key
-  end
+  # Say how the API authenticates: :api_key, :basic, :bearer or :mtls.
+  # Each expects its credential in a conventional setting; :bearer
+  # expects MyCoolApi.api_key, which this line declares.
+  authenticate_with :bearer
 
   # Configure your API client (an initializer is the usual place)
   configure do |config|
@@ -61,10 +61,6 @@ module MyCoolApi
     config.api_key  = ENV['MY_COOL_API_KEY']
     config.logger   = Logger.new($stdout)
   end
-
-  # Say how the API authenticates: :api_key, :basic, :bearer or :mtls.
-  # The credential is a callable, so it is read on each request.
-  authenticate_with :bearer, token: -> { MyCoolApi.api_key }
 
   # Define a resource
   class Widget < ApiResource

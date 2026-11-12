@@ -1,11 +1,15 @@
 module Resteze
   class Authenticator
     # HTTP Basic: an Authorization header carrying the base64 of
-    # "username:password".
+    # "username:password", read from `MyApi.username` and `MyApi.password`
+    # unless told otherwise.
     #
-    #   strategy :basic, username: -> { MyApi.username }, password: -> { MyApi.password }
+    #   authenticate_with :basic
+    #   authenticate_with :basic, username: :api_user, password: :api_secret
     class Basic < Strategy
-      def initialize(username:, password:)
+      DEFAULTS = { username: :username, password: :password }.freeze
+
+      def initialize(username: :username, password: :password)
         super()
         @username = Strategy.required!(:username, username)
         @password = Strategy.required!(:password, password)

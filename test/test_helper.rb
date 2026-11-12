@@ -174,11 +174,7 @@ end
 module AuthApi
   include Resteze
 
-  class << self
-    attr_accessor :api_key
-  end
-
-  authenticate_with :api_key, header: "X-Api-Key", value: -> { AuthApi.api_key }
+  authenticate_with :api_key, header: "X-Api-Key" # expects AuthApi.api_key
 
   class Widget < ApiResource
     include Save

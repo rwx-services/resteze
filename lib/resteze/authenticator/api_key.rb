@@ -2,14 +2,18 @@ module Resteze
   class Authenticator
     # An API key sent in a header (default X-Api-Key) or, with `query:`, as
     # a query-string parameter on every request regardless of HTTP method.
+    # The key is `MyApi.api_key` unless `value:` names another setting.
     #
-    #   strategy :api_key, header: "X-Api-Key", value: -> { MyApi.api_key }
-    #   strategy :api_key, header: "Authorization", value: -> { "Token #{MyApi.api_key}" }
-    #   strategy :api_key, query: "api_key", value: -> { MyApi.api_key }
+    #   authenticate_with :api_key                           # X-Api-Key: <MyApi.api_key>
+    #   authenticate_with :api_key, header: "X-Partner-Key", value: :partner_key
+    #   authenticate_with :api_key, query: "api_key"
+    #   authenticate_with :api_key, header: "Authorization", value: -> { "Token #{MyApi.api_key}" }
     class ApiKey < Strategy
+      DEFAULTS = { value: :api_key }.freeze
+
       attr_reader :header, :query
 
-      def initialize(value:, header: nil, query: nil)
+      def initialize(value: :api_key, header: nil, query: nil)
         super()
         raise ArgumentError, "api_key takes header: or query:, not both" if header && query
 

@@ -85,17 +85,13 @@ end
 
 ## Authentication
 
-Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `authenticate_with` on the module names a built-in and hands it the credential. The credential is normally a callable that reads a module setting, which an initializer fills through `configure`; the callable runs on each request, so a rotated key takes effect without a restart, and a setting that is still `nil` when a request goes out raises an `ArgumentError` naming the option rather than sending an empty credential:
+Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `authenticate_with` on the module names a built-in. Each built-in expects its credential in a conventional module setting (`api_key`, `username` and `password`, `client_cert` and `client_key`), declares that setting on the module, and reads it on every request, so an initializer fills it through `configure` like any other setting and a rotated value takes effect without a restart. A setting that is still `nil` when a request goes out raises an `ArgumentError` naming it (`MyApi.api_key is not set`) rather than sending an empty credential; `MyApi.authenticator.missing_settings` lists them for a boot-time check:
 
 ```ruby
 module MyApi
   include Resteze
 
-  class << self
-    attr_accessor :api_key
-  end
-
-  authenticate_with :api_key, header: 'X-Api-Key', value: -> { MyApi.api_key }
+  authenticate_with :api_key, header: 'X-Api-Key'
 end
 
 # config/initializers/my_api.rb
@@ -104,14 +100,14 @@ MyApi.configure do |config|
 end
 ```
 
-| Scheme | Options | Sends |
-|---|---|---|
-| `:api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
-| `:basic` | `username:`, `password:` | `Authorization: Basic …` |
-| `:bearer` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
-| `:mtls` | `cert:`, `key:`, `ca_file:`, `passphrase:`, `verify:` | a client certificate on the TLS connection |
+| Scheme | Expects | Options | Sends |
+|---|---|---|---|
+| `:api_key` | `api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
+| `:basic` | `username`, `password` | `username:`, `password:` | `Authorization: Basic …` |
+| `:bearer` | `api_key` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
+| `:mtls` | `client_cert`, `client_key`, `client_key_passphrase` | `cert:`, `key:`, `passphrase:`, `ca_file:`, `verify:` | a client certificate on the TLS connection |
 
-Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.) `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
+The convention is a default. Any credential option also takes a Symbol naming a different setting (`value: :partner_key`), a callable (`token: -> { TokenStore.current }`), or a literal. Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.) `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
 
 ### The lifecycle
 
@@ -119,12 +115,14 @@ The client calls the authenticator at three points: `connection_options` when th
 
 ### Custom schemes
 
-Every built-in is a subclass of `Resteze::Authenticator::Strategy`, and a custom scheme is the same: implement `apply(request, state)`, and `connection_options` or `refresh?(error, attempt, state)` when needed. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
+Every built-in is a subclass of `Resteze::Authenticator::Strategy`, and a custom scheme is the same: implement `apply(request, state)`, and `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings, exactly as the built-ins do; `resolve`/`resolve!` read a Symbol, callable or literal option. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
 
 ```ruby
 module MyApi
   class SessionToken < Resteze::Authenticator::Strategy
-    def initialize(login_url:, username:, password:)
+    DEFAULTS = { username: :username, password: :password }.freeze   # the settings this scheme expects
+
+    def initialize(login_url:, username: :username, password: :password)
       super()
       @login_url, @username, @password = login_url, username, password
     end
@@ -149,8 +147,7 @@ module MyApi
     end
   end
 
-  authenticate_with SessionToken, login_url: 'https://api.example.com/login',
-                                  username: -> { MyApi.username }, password: -> { MyApi.password }
+  authenticate_with SessionToken, login_url: 'https://api.example.com/login'   # expects MyApi.username and .password
 end
 ```
 

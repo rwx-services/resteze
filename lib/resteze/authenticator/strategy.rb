@@ -6,13 +6,16 @@ module Resteze
     # that hash is shared by every strategy on the authenticator, prefix
     # the keys you store with the scheme's name.
     #
-    # Credential options take a value or a callable. The callable form is
-    # the usual one: `value: -> { MyApi.api_key }` reads a setting that an
-    # initializer filled through `MyApi.configure`, on every request, so a
-    # rotated credential takes effect without a restart.
+    # Credential options name module settings. A Symbol such as `:api_key`
+    # reads `MyApi.api_key`, which an initializer fills through
+    # `MyApi.configure`, on every request. Each built-in defaults to the
+    # obvious setting (see its DEFAULTS), and declaring the scheme declares
+    # the setting on the module, so `config.api_key = ...` needs no
+    # `attr_accessor`. A callable or a literal works in place of a Symbol.
     #
-    # To add a scheme, subclass this, implement `apply`, and pass the class
-    # to `strategy` with its options.
+    # To add a scheme, subclass this, implement `apply`, declare DEFAULTS
+    # for any options that should read settings, and pass the class to
+    # `authenticate_with` with its options.
     class Strategy
       BUILT_IN = {
         api_key: "Resteze::Authenticator::ApiKey",
@@ -21,11 +24,21 @@ module Resteze
         mtls: "Resteze::Authenticator::Mtls"
       }.freeze
 
+      # Option defaults; Symbol values are settings read from the module.
+      DEFAULTS = {}.freeze
+
+      attr_accessor :api_module
+
       def self.lookup(name)
         class_name = BUILT_IN[name.to_sym] or
           raise ArgumentError, "unknown authentication strategy #{name.inspect}; known: #{BUILT_IN.keys.join(', ')}"
 
         class_name.constantize
+      end
+
+      # The module settings these options (over the defaults) read.
+      def self.settings(options = {})
+        self::DEFAULTS.merge(options).values.grep(Symbol)
       end
 
       def self.required!(name, value)
@@ -52,19 +65,24 @@ module Resteze
 
       private
 
-      # A callable is called, anything else is used as is.
+      # A Symbol reads the named setting from the module (nil when the
+      # module has no such setting), a callable is called, anything else is
+      # used as is.
       def resolve(value)
-        value.respond_to?(:call) ? value.call : value
+        return value.call if value.respond_to?(:call)
+        return value unless value.is_a?(Symbol)
+
+        api_module.respond_to?(value) ? api_module.public_send(value) : nil
       end
 
-      # As `resolve`, but a nil result (an unset setting, say) is an error
-      # rather than an empty credential on the wire.
+      # As `resolve`, but a nil result is a configuration error that names
+      # what to set.
       def resolve!(option, value)
         resolved = resolve(value)
         return resolved unless resolved.nil?
 
-        raise ArgumentError, "#{option}: for the #{self.class.name.demodulize.underscore} authentication strategy " \
-                             "resolved to nil; is the setting it reads configured?"
+        where = value.is_a?(Symbol) ? "#{api_module}.#{value} is not set" : "#{option}: resolved to nil"
+        raise ArgumentError, "#{where}; the #{self.class.name.demodulize.underscore} authentication strategy needs it"
       end
     end
   end

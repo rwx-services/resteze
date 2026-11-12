@@ -18,29 +18,29 @@ module Resteze
   #     send the request once more, for schemes whose credential can be
   #     renewed; `attempt` counts failures so far, starting at 1.
   #
-  # The built-in schemes are chosen with `strategy`, and several may be
-  # combined, for example mutual TLS with an API key. The credential is
-  # usually a callable reading a module setting that an initializer filled
-  # through `configure`, so it is read on every request:
+  # The built-in schemes are chosen with `authenticate_with` on the module
+  # (or `strategy` inside this class), and several may be combined, for
+  # example mutual TLS with an API key. Each scheme expects its credential
+  # in a module setting that an initializer fills through `configure`, and
+  # declaring the scheme declares the setting:
   #
   #   module MyApi
   #     include Resteze
   #
-  #     class << self
-  #       attr_accessor :api_key
-  #     end
-  #
-  #     class Authenticator
-  #       strategy :api_key, header: "X-Api-Key", value: -> { MyApi.api_key }
-  #     end
+  #     authenticate_with :api_key, header: "X-Api-Key"   # expects MyApi.api_key
   #   end
   #
   #   MyApi.configure { |config| config.api_key = ENV["MY_API_KEY"] }
   #
-  #   strategy :api_key, header: "X-Api-Key", value: ...     # or query: "api_key"
-  #   strategy :basic,   username: ..., password: ...
-  #   strategy :bearer,  token: ...                          # scheme: "Token" for other prefixes
-  #   strategy :mtls,    cert: ..., key: ..., ca_file: ...   # PEM strings or paths
+  #   authenticate_with :api_key   # MyApi.api_key in X-Api-Key (or query: "..."); value: names another setting
+  #   authenticate_with :basic     # MyApi.username and MyApi.password
+  #   authenticate_with :bearer    # "Bearer <MyApi.api_key>"; token: names another setting, scheme: another prefix
+  #   authenticate_with :mtls      # MyApi.client_cert and MyApi.client_key (PEM or path), MyApi.client_key_passphrase
+  #
+  # Any credential option also takes a callable, for a credential that
+  # comes from somewhere other than configuration, or a literal value.
+  # `MyApi.authenticator.missing_settings` lists expected settings still
+  # nil, for a boot-time check.
   #
   # Each built-in is a subclass of Resteze::Authenticator::Strategy, and a
   # custom scheme is the same: subclass it, implement `apply`, and pass the
@@ -69,8 +69,25 @@ module Resteze
         return strategy_specs if name.nil? && options.empty?
         raise ArgumentError, "strategy needs a name or class before its options" if name.nil?
 
-        own_strategy_specs << [name.is_a?(Class) ? name : Strategy.lookup(name), options]
+        klass = name.is_a?(Class) ? name : Strategy.lookup(name)
+        declare_settings(klass.settings(options))
+        own_strategy_specs << [klass, options]
         nil
+      end
+
+      # The module settings every configured strategy reads, in order.
+      def settings
+        strategy_specs.flat_map { |klass, options| klass.settings(options) }.uniq
+      end
+
+      # Declares those settings on the API module (`api_key`, `username`,
+      # ...) so an initializer can set them through `configure` with no
+      # `attr_accessor` of its own. Existing accessors are left alone.
+      def declare_settings(names)
+        mod = api_module
+        return if mod.nil? || mod == Resteze
+
+        names.each { |name| mod.singleton_class.attr_accessor(name) unless mod.respond_to?(name) }
       end
 
       def strategy_specs
@@ -92,16 +109,30 @@ module Resteze
     end
 
     attr_reader :strategies
-    attr_writer :api_module
 
     def initialize(strategies: self.class.strategy_instances, strategy: nil)
       initialize_state
       @strategies = Array(strategy || strategies).freeze
+      self.api_module = self.class.api_module
     end
 
-    # The module this authenticator serves. Set by MyApi.authenticator=.
+    # The module this authenticator serves, and whose settings its
+    # strategies read. Set by MyApi.authenticator=.
     def api_module
       @api_module || self.class.api_module
+    end
+
+    def api_module=(mod)
+      @api_module = mod
+      strategies.each { |strategy| strategy.api_module = mod if strategy.respond_to?(:api_module=) }
+    end
+
+    # The settings the configured strategies expect on the module that are
+    # still nil, for checking configuration at boot:
+    #
+    #   raise "MyApi needs #{MyApi.authenticator.missing_settings.join(', ')}" if MyApi.authenticator.missing_settings.any?
+    def missing_settings
+      self.class.settings.select { |name| api_module.respond_to?(name) && api_module.public_send(name).nil? }
     end
 
     # Faraday connection options merged from every strategy, such as `ssl:`.

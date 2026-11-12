@@ -106,6 +106,27 @@ module Resteze
     end
 
     describe "credentials from module settings" do
+      it "declares the expected settings on the module when the scheme is declared" do
+        assert_respond_to AuthApi, :api_key
+        assert_respond_to AuthApi, :api_key=
+        refute_respond_to AcmeApi, :username
+
+        Class.new(AuthApi::Authenticator) { strategy :basic, password: :api_secret }
+
+        assert_respond_to AuthApi, :username
+        assert_respond_to AuthApi, :api_secret
+        assert_equal %i[api_key], AuthApi::Authenticator.settings
+      end
+
+      it "defaults each built-in to the obvious settings" do
+        assert_equal %i[api_key],           Authenticator::ApiKey.settings
+        assert_equal %i[api_key],           Authenticator::Bearer.settings
+        assert_equal %i[username password], Authenticator::Basic.settings
+        assert_equal %i[client_cert client_key client_key_passphrase], Authenticator::Mtls.settings
+        assert_equal %i[partner_key], Authenticator::ApiKey.settings(value: :partner_key)
+        assert_empty Authenticator::ApiKey.settings(value: -> { "k" })
+      end
+
       it "reads the setting on every request, so a rotated credential takes effect" do
         AuthApi.api_key = "rotated"
         stub_request(:get, URL).to_return(body: "{}")
@@ -117,21 +138,38 @@ module Resteze
         AuthApi.api_key = "secret-key"
       end
 
-      it "fails clearly when the setting is not configured" do
+      it "names the missing setting when it is not configured" do
         AuthApi.api_key = nil
 
         error = assert_raises(ArgumentError) { AuthApi::Widget.retrieve(1) }
 
-        assert_match(/value: for the api_key authentication strategy resolved to nil/, error.message)
+        assert_match(/AuthApi\.api_key is not set; the api_key authentication strategy needs it/, error.message)
+        assert_equal %i[api_key], AuthApi.authenticator.missing_settings
       ensure
         AuthApi.api_key = "secret-key"
+
+        assert_empty AuthApi.authenticator.missing_settings
       end
 
-      it "accepts a literal as well as a callable" do
-        req = request
-        Authenticator::Bearer.new(token: "literal").apply(req, {})
+      it "accepts a callable or a literal in place of a setting name" do
+        req = AuthApi::Authenticator.new(strategies: [Authenticator::ApiKey.new(value: -> { "called" }),
+                                                      Authenticator::Bearer.new(token: "literal")]).apply(request)
 
+        assert_equal "called",         req.headers["X-Api-Key"]
         assert_equal "Bearer literal", req.headers["Authorization"]
+
+        error = assert_raises(ArgumentError) { Authenticator::Bearer.new(token: -> {}).apply(request, {}) }
+
+        assert_match(/token: resolved to nil/, error.message)
+      end
+
+      it "reads settings from the module a replacement authenticator is assigned to" do
+        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Authenticator::Bearer.new)
+        stub_request(:get, URL).to_return(body: "{}")
+
+        AuthApi::Client.new.execute_request(:get, "/widgets/1")
+
+        assert_requested(:get, URL, headers: { "Authorization" => "Bearer secret-key" })
       end
     end
 
