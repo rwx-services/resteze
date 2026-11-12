@@ -85,7 +85,7 @@ end
 
 ## Authentication
 
-Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `strategy` names a built-in and hands it the credential. The credential is normally a callable that reads a module setting, which an initializer fills through `configure`; the callable runs on each request, so a rotated key takes effect without a restart, and a setting that is still `nil` when a request goes out raises an `ArgumentError` naming the option rather than sending an empty credential:
+Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `authenticate_with` on the module names a built-in and hands it the credential. The credential is normally a callable that reads a module setting, which an initializer fills through `configure`; the callable runs on each request, so a rotated key takes effect without a restart, and a setting that is still `nil` when a request goes out raises an `ArgumentError` naming the option rather than sending an empty credential:
 
 ```ruby
 module MyApi
@@ -95,9 +95,7 @@ module MyApi
     attr_accessor :api_key
   end
 
-  class Authenticator
-    strategy :api_key, header: 'X-Api-Key', value: -> { MyApi.api_key }
-  end
+  authenticate_with :api_key, header: 'X-Api-Key', value: -> { MyApi.api_key }
 end
 
 # config/initializers/my_api.rb
@@ -113,7 +111,7 @@ end
 | `:bearer` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
 | `:mtls` | `cert:`, `key:`, `ca_file:`, `passphrase:`, `verify:` | a client certificate on the TLS connection |
 
-Schemes combine; call `strategy` once per scheme. `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
+Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.) `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
 
 ### The lifecycle
 
@@ -151,10 +149,8 @@ module MyApi
     end
   end
 
-  class Authenticator
-    strategy SessionToken, login_url: 'https://api.example.com/login',
-                           username: -> { MyApi.username }, password: -> { MyApi.password }
-  end
+  authenticate_with SessionToken, login_url: 'https://api.example.com/login',
+                                  username: -> { MyApi.username }, password: -> { MyApi.password }
 end
 ```
 
@@ -634,13 +630,13 @@ The instance is `MyApi.rate_limiter`; assign one to replace it. Each attempt of 
 
 ### Choosing a strategy
 
-The four common algorithms are built in. Pick one with `strategy` in your module's `RateLimiter`:
+The four common algorithms are built in. Pick one with `rate_limit_with` on the module (or `strategy` inside `class RateLimiter`, when you are reopening it anyway):
 
 ```ruby
 module Braze
-  class RateLimiter
-    strategy :fixed_window, limit: 250_000, window: 3600, headers: true
-  end
+  include Resteze
+
+  rate_limit_with :fixed_window, limit: 250_000, window: 3600, headers: true
 end
 ```
 

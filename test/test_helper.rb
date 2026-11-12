@@ -178,9 +178,7 @@ module AuthApi
     attr_accessor :api_key
   end
 
-  class Authenticator
-    strategy :api_key, header: "X-Api-Key", value: -> { AuthApi.api_key }
-  end
+  authenticate_with :api_key, header: "X-Api-Key", value: -> { AuthApi.api_key }
 
   class Widget < ApiResource
     include Save
@@ -194,6 +192,15 @@ AuthApi.configure do |config|
   config.api_base = "http://auth.example.com/"
   config.api_key  = "secret-key"
   config.logger   = Logger.new(nil)
+end
+
+# Configured entirely through the module-level macros.
+module MacroApi
+  include Resteze
+
+  authenticate_with :bearer, token: "t"
+  authenticate_with :api_key, value: "k"
+  rate_limit_with :token_bucket, capacity: 5, refill_rate: 1
 end
 
 def configure_gem!

@@ -38,6 +38,27 @@ module Resteze
       end
     end
 
+    describe "the module-level macros" do
+      it "configure the module's Authenticator and RateLimiter without opening them" do
+        assert_equal [Authenticator::Bearer, Authenticator::ApiKey], MacroApi::Authenticator.strategy.map(&:first)
+        assert_equal 2, MacroApi.authenticator.strategies.size
+        assert_kind_of Resteze::RateLimiter::TokenBucket, MacroApi.rate_limiter.strategy
+        assert_in_delta 5.0, MacroApi.rate_limiter.strategy.capacity
+      end
+
+      it "apply through the client like the class form" do
+        req = MacroApi.authenticator.apply(request)
+
+        assert_equal "Bearer t", req.headers["Authorization"]
+        assert_equal "k",        req.headers["X-Api-Key"]
+      end
+
+      it "refuse to run on Resteze itself or on a module that has not included it" do
+        assert_raises(ArgumentError) { Resteze.authenticate_with(:bearer, token: "t") }
+        assert_raises(ArgumentError) { Module.new.extend(Resteze::ClassMethods).rate_limit_with(:token_bucket, capacity: 1, refill_rate: 1) }
+      end
+    end
+
     describe "the strategy macro" do
       it "configures one or several strategies, inherited by subclasses" do
         klass = Class.new(Resteze::Authenticator) do

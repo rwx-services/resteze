@@ -64,9 +64,7 @@ module MyCoolApi
 
   # Say how the API authenticates: :api_key, :basic, :bearer or :mtls.
   # The credential is a callable, so it is read on each request.
-  class Authenticator
-    strategy :bearer, token: -> { MyCoolApi.api_key }
-  end
+  authenticate_with :bearer, token: -> { MyCoolApi.api_key }
 
   # Define a resource
   class Widget < ApiResource

@@ -99,6 +99,29 @@ module Resteze
       @action_defaults.merge!(options)
       nil
     end
+
+    # Chooses how the API authenticates, without opening the module's
+    # Authenticator: `authenticate_with :api_key, header: "X-Api-Key",
+    # value: -> { MyApi.api_key }`. Call it once per scheme to combine
+    # them. Reopen MyApi::Authenticator only to override its lifecycle.
+    def authenticate_with(name, **)
+      component_class(:Authenticator).strategy(name, **)
+    end
+
+    # Chooses how the client paces itself, without opening the module's
+    # RateLimiter: `rate_limit_with :fixed_window, limit: 100, window: 60`.
+    # Reopen MyApi::RateLimiter to override `retry?` and the rest.
+    def rate_limit_with(name, **)
+      component_class(:RateLimiter).strategy(name, **)
+    end
+
+    private
+
+    def component_class(name)
+      raise ArgumentError, "call this on a module that includes Resteze, after the include" unless include?(Resteze)
+
+      const_get(name, false)
+    end
   end
 
   extend ClassMethods
