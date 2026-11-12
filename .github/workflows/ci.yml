@@ -20,7 +20,8 @@ jobs:
           - "3.2"
           - "3.3"
           - "3.4"
-    name: Ruby ${{ matrix.ruby }}
+          - "4.0"
+    name: Tests (Ruby ${{ matrix.ruby }})
     steps:
       - uses: actions/checkout@v7
       - name: Set up Ruby
@@ -33,7 +34,7 @@ jobs:
       - name: Run tests with coverage
         run: bundle exec rake test
       - name: Coveralls
-        if: matrix.ruby == '3.4'
+        if: matrix.ruby == '4.0'
         uses: coverallsapp/github-action@v2
 
   static_analysis:
@@ -45,7 +46,8 @@ jobs:
           - "3.2"
           - "3.3"
           - "3.4"
-    name: Ruby ${{ matrix.ruby }}
+          - "4.0"
+    name: RuboCop (Ruby ${{ matrix.ruby }})
     steps:
       - uses: actions/checkout@v7
       - name: Set up Ruby
