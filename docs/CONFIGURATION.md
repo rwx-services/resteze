@@ -2,6 +2,7 @@
 
 ## Table of Contents
 - [Basic Configuration](#basic-configuration)
+- [Authentication](#authentication)
 - [Environment-based Configuration](#environment-based-configuration)
 - [Dynamic Configuration](#dynamic-configuration)
 - [Connection Configuration](#connection-configuration)
@@ -81,6 +82,69 @@ module MyApi
   end
 end
 ```
+
+## Authentication
+
+Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme with `authenticate_with` on the module. A scheme is a `Resteze::Authenticator::Strategy` subclass; it expects its credential in a conventional module setting, declares that setting on the module when chosen, and reads it on every request, so an initializer fills it through `configure` like any other setting and a rotated value takes effect without a restart. A setting that is still `nil` when a request goes out raises an `ArgumentError` naming it rather than sending an empty credential; `MyApi.authenticator.missing_settings` lists them for a boot-time check.
+
+```ruby
+module MyApi
+  include Resteze
+
+  authenticate_with SomeScheme, header: 'X-Api-Key'   # expects whatever SomeScheme's DEFAULTS name, e.g. MyApi.api_key
+end
+
+# config/initializers/my_api.rb
+MyApi.configure do |config|
+  config.api_key = ENV['MY_API_KEY']
+end
+```
+
+The convention is a default. Any credential option also takes a Symbol naming a different setting (`value: :partner_key`), a callable (`value: -> { TokenStore.current }`), or a literal. Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.)
+
+### The lifecycle
+
+The client calls the authenticator at three points: `connection_options` when the per-thread connection is built (an override of `Client.default_connection` must pass them to Faraday itself), `apply(request)` before every request (with `headers`, `params` and `query` to mutate; `query` always goes in the query string whatever the method), and `refresh?(error, attempt)` after a `MyApi::AuthenticationError`, where returning `true` sends the request once more with a renewed credential.
+
+### Writing a scheme
+
+Subclass `Resteze::Authenticator::Strategy` and implement `apply(request, state)`; add `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings. `resolve` reads an option whether it is a Symbol (from the module), a callable, or a literal; `resolve!` does the same and raises a clear `ArgumentError` on `nil`. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
+
+```ruby
+module MyApi
+  class SessionToken < Resteze::Authenticator::Strategy
+    DEFAULTS = { username: :username, password: :password }.freeze   # the settings this scheme expects
+
+    def initialize(login_url:, username: :username, password: :password)
+      super()
+      @login_url, @username, @password = login_url, username, password
+    end
+
+    def apply(request, state)
+      state[:session_token] ||= login
+      request.headers['X-Session-Token'] = state[:session_token]
+    end
+
+    def refresh?(_error, attempt, state)
+      return false if attempt > 1
+
+      state[:session_token] = login
+      true
+    end
+
+    private
+
+    def login
+      body = { username: resolve!(:username, @username), password: resolve!(:password, @password) }.to_json
+      JSON.parse(Faraday.post(@login_url, body, 'Content-Type' => 'application/json').body).fetch('token')
+    end
+  end
+
+  authenticate_with SessionToken, login_url: 'https://api.example.com/login'   # expects MyApi.username and .password
+end
+```
+
+`MyApi.authenticator` is the instance the client uses; assign another to replace it (tests do this to swap credentials) or `nil` to restore the default. `Client#request_headers` remains overridable for headers that are not a credential.
 
 ## Environment-based Configuration
 
