@@ -22,12 +22,10 @@ StandardError
         ├── YourApi::ApiConnectionError  (connection refused, timeout, SSL)
         ├── YourApi::AuthenticationError (401, 403)
         ├── YourApi::InvalidRequestError (400, and requests the client cannot build)
-        └── YourApi::RateLimitError      (429, with #retry_after)
-
-Faraday-derived errors kept for compatibility (not subclasses of YourApi::Error):
-├── YourApi::ResourceNotFound          < Faraday::ResourceNotFound (404)
-├── YourApi::UnprocessableEntityError  < Faraday::UnprocessableEntityError (422)
-└── YourApi::ConflictError             < Faraday::ConflictError (409)
+        ├── YourApi::RateLimitError      (429, with #retry_after)
+        ├── YourApi::ResourceNotFound    (404)
+        ├── YourApi::ConflictError       (409)
+        └── YourApi::UnprocessableEntityError (422)
 
 Also namespaced:
 └── YourApi::NotImplementedError
@@ -184,7 +182,7 @@ rescue MyApi::Error => e
 end
 ```
 
-The Faraday-derived `ResourceNotFound`, `UnprocessableEntityError` and `ConflictError` expose the same response through Faraday's own readers: `e.response`, `e.response_status`, `e.response_headers` and `e.response_body`.
+Every error also answers Faraday's reader names, `response_status`, `response_headers` and `response_body`, as aliases of the `http_` readers. Code written against the earlier Faraday-derived `ResourceNotFound`, `UnprocessableEntityError` and `ConflictError` keeps working.
 
 ## Handling Errors
 

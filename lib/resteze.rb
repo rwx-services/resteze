@@ -128,9 +128,6 @@ module Resteze
     # Namespace other exceptions that we want to be able to catch and make sense of
     # without needing lower level implementation details
     const_set :NotImplementedError, Class.new(NotImplementedError)
-    const_set :ResourceNotFound, Class.new(Faraday::ResourceNotFound)
-    const_set :UnprocessableEntityError, Class.new(Faraday::UnprocessableEntityError)
-    const_set :ConflictError, Class.new(Faraday::ConflictError)
 
     # Setup our Magic Constants
     const_set(:ListObject, Class.new(Hashie::Array)).class_eval do

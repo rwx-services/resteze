@@ -2,8 +2,8 @@ module Resteze
   module Middleware
     # Maps Faraday's errors onto the API module's namespaced hierarchy so a
     # consumer can `rescue MyApi::Error` and catch everything the client
-    # raises. 404, 409 and 422 keep their Faraday-derived namespaced classes
-    # for compatibility; everything else becomes a subclass of MyApi::Error.
+    # raises. Every error is a subclass of MyApi::Error; the Faraday error
+    # is kept as `cause`.
     class RaiseError < Faraday::Response::RaiseError
       include Resteze::ApiModule
 
@@ -12,6 +12,9 @@ module Resteze
       # Faraday error class => namespaced error type. Order matters: the first
       # entry the error is_a? wins, so specific classes come before ClientError.
       STATUS_ERRORS = [
+        [Faraday::ResourceNotFound,    :ResourceNotFound],
+        [Faraday::ConflictError,       :ConflictError],
+        [Faraday::UnprocessableEntityError, :UnprocessableEntityError],
         [Faraday::UnauthorizedError,   :AuthenticationError],
         [Faraday::ForbiddenError,      :AuthenticationError],
         [Faraday::TooManyRequestsError, :RateLimitError],
@@ -29,12 +32,6 @@ module Resteze
 
       def on_complete(env)
         super
-      rescue Faraday::ConflictError => e
-        raise api_module::ConflictError.new(e, e.response)
-      rescue Faraday::UnprocessableEntityError => e
-        raise api_module::UnprocessableEntityError.new(e, e.response)
-      rescue Faraday::ResourceNotFound => e
-        raise api_module::ResourceNotFound.new(e, e.response)
       rescue Faraday::Error => e
         raise mapped_error(e)
       end

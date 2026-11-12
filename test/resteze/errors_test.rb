@@ -90,6 +90,13 @@ module Resteze
         refute_operator AcmeApi::ApiError, :<, VerbApi::Error
       end
 
+      it "includes the 404, 409 and 422 classes" do
+        %i[ResourceNotFound ConflictError UnprocessableEntityError].each do |name|
+          assert_operator AcmeApi.const_get(name), :<, AcmeApi::Error
+          refute_operator AcmeApi.const_get(name), :<, Faraday::Error
+        end
+      end
+
       it "keeps type behaviour on the namespaced classes" do
         assert_equal "id", AcmeApi::InvalidRequestError.new("message", "id").param
         assert_respond_to AcmeApi::RateLimitError.new("slow"), :retry_after
@@ -116,6 +123,14 @@ module Resteze
         error = Resteze::ApiError.from_faraday(faraday_error, "custom")
 
         assert_equal "custom", error.message
+      end
+
+      it "exposes Faraday-style readers alongside the http_ ones" do
+        error = Resteze::ApiError.from_faraday(faraday_error(headers: { "Request-Id" => "req_9" }))
+
+        assert_equal error.http_status,  error.response_status
+        assert_equal error.http_body,    error.response_body
+        assert_equal error.http_headers, error.response_headers
       end
 
       it "tolerates an error with no response" do

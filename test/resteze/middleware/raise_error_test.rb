@@ -55,19 +55,32 @@ module Resteze
           assert_equal 503, request_error(AcmeApi::ApiError).http_status
         end
 
-        it "keeps the namespaced Faraday classes for 404, 409 and 422" do
-          stub_status(404)
+        it "raises namespaced Error subclasses for 404, 409 and 422" do
+          { 404 => AcmeApi::ResourceNotFound, 409 => AcmeApi::ConflictError,
+            422 => AcmeApi::UnprocessableEntityError }.each do |status, klass|
+            stub_status(status)
+            error = request_error(klass)
+
+            assert_kind_of AcmeApi::Error, error
+            assert_equal status, error.http_status
+            assert_kind_of Faraday::ClientError, error.cause
+          end
+        end
+
+        it "keeps the Faraday-style readers on those errors" do
+          stub_status(404, body: '{"message":"gone"}')
           error = request_error(AcmeApi::ResourceNotFound)
 
-          assert_equal 404, error.response_status
+          assert_equal 404,                  error.response_status
+          assert_equal '{"message":"gone"}', error.response_body
+          assert_equal "req_1",              error.response_headers["Request-Id"]
+          assert_equal 404,                  error.response[:status]
+        end
 
-          stub_status(409)
+        it "lets rescue AcmeApi::Error catch a 404" do
+          stub_status(404)
 
-          assert_equal 409, request_error(AcmeApi::ConflictError).response_status
-
-          stub_status(422)
-
-          assert_equal 422, request_error(AcmeApi::UnprocessableEntityError).response_status
+          assert_raises(AcmeApi::Error) { subject.execute_request(:get, "/widgets/1") }
         end
       end
 

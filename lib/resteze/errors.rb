@@ -5,6 +5,12 @@ module Resteze
     attr_accessor :response
     attr_reader   :message, :code, :http_body, :http_headers, :http_status, :json_body
 
+    # Faraday-style readers, for code written against the Faraday-derived
+    # ResourceNotFound, ConflictError and UnprocessableEntityError of 0.5.0.
+    alias response_status  http_status
+    alias response_headers http_headers
+    alias response_body    http_body
+
     # Builds an error from a Faraday error, carrying over its HTTP response.
     # The Faraday error becomes `cause` when raised from a rescue block.
     def self.from_faraday(error, message = error.message)
@@ -118,7 +124,10 @@ module Resteze
       AuthenticationError: nil,
       ApiConnectionError: nil,
       ApiError: nil,
-      RateLimitError: RateLimited
+      RateLimitError: RateLimited,
+      ResourceNotFound: nil,
+      ConflictError: nil,
+      UnprocessableEntityError: nil
     }.freeze
 
     def self.define(namespace, base)
