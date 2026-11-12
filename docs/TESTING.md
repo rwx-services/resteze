@@ -288,6 +288,26 @@ class UserSaveTest < ApiTestCase
 end
 ```
 
+### Testing Destroy Operations
+
+```ruby
+class UserDestroyTest < ApiTestCase
+  def test_destroy_user
+    stub_api_request(:delete, '/users/123').to_return(status: 204, body: '')
+
+    result = TestApi::User.destroy('123')
+
+    assert_requested :delete, api_url('/users/123')
+    assert_empty result
+    assert_equal 204, result.http_response.http_status
+  end
+
+  def test_destroy_requires_an_id
+    assert_raises(TestApi::InvalidRequestError) { TestApi::User.new.destroy }
+  end
+end
+```
+
 ## Integration Testing
 
 ### Full Request Cycle Testing

@@ -10,8 +10,8 @@ pattern at all.
 The `action` DSL, modeled on the Rails routing DSL for custom resource actions,
 covers both. A resource declares the actions it supports; each action resolves to
 an HTTP method, a path and a return type. The built-in `retrieve`, `list`,
-`create` and `update` are ordinary actions with REST defaults, so re-routing one
-uses the same vocabulary as adding a new one.
+`create`, `update` and `destroy` are ordinary actions with REST defaults, so
+re-routing one uses the same vocabulary as adding a new one.
 
 **A resource that declares nothing behaves exactly as it did before.**
 
@@ -19,6 +19,7 @@ uses the same vocabulary as adding a new one.
 - [Declaring custom actions](#declaring-custom-actions)
 - [Collection and member actions](#collection-and-member-actions)
 - [Re-routing the built-in actions](#re-routing-the-built-in-actions)
+- [Destroying records](#destroying-records)
 - [API-wide defaults](#api-wide-defaults)
 - [Lookup order](#lookup-order)
 - [Return values](#return-values)
@@ -70,7 +71,6 @@ an action whose method name already exists on the class:
 ```ruby
 action :send, method: :post               # ArgumentError: Object#send exists; pass as:
 action :send, method: :post, as: :deliver # MyApi::Message.deliver(...)
-action :delete, method: :post, on: :member, as: :destroy
 ```
 
 ## Collection and member actions
@@ -106,7 +106,7 @@ member action on a record with a blank id raises `MyApi::InvalidRequestError`.
 
 ## Re-routing the built-in actions
 
-Four names are reserved and pre-registered with REST defaults:
+Five names are reserved and pre-registered with REST defaults:
 
 | Name | Method | Scope | Path | Id |
 |---|---|---|---|---|
@@ -114,16 +114,19 @@ Four names are reserved and pre-registered with REST defaults:
 | `list` | GET | collection | none | n/a |
 | `create` | POST | collection | none | n/a |
 | `update` | PUT | member | none | `:path` |
+| `destroy` | DELETE | member | none | `:path` |
 
 Redeclaring one replaces its route. Options you leave out fall through to the
 next level of the [lookup order](#lookup-order), so changing just the path is one
-line. The existing `retrieve`, `list` and `save` methods keep their behavior and
-only pick up the new route; no new method is generated for a reserved name.
+line. The existing `retrieve`, `list`, `save` and `destroy` methods keep their
+behavior and only pick up the new route; no new method is generated for a
+reserved name.
 
 ```ruby
 class ContentBlock < ApiResource
   include List
   include Save
+  include Destroy
 
   property :id
 
@@ -132,8 +135,36 @@ class ContentBlock < ApiResource
   action :create,   path: "create"               # POST /content_blocks/create
   action :update,   path: "update", method: :post, id: :param
   # => POST /content_blocks/update with content_block_id in the body
+  action :destroy,  path: "delete", method: :post, id: :param
+  # => POST /content_blocks/delete with content_block_id in the body
 end
 ```
+
+## Destroying records
+
+Like `list` and `save`, the `destroy` method is opt-in through a mixin, so a
+resource that must never be deleted does not grow the method by accident. The
+route is the built-in `destroy` action: `DELETE /widgets/:id` unless re-routed.
+
+```ruby
+class Widget < ApiResource
+  include Destroy
+
+  property :id
+end
+
+widget.destroy                   # DELETE /widgets/42
+MyApi::Widget.destroy("42")      # same request
+```
+
+`destroy` returns a `MyApi::Result` built from the response, empty for a
+`204 No Content`, and raises `MyApi::InvalidRequestError` on a blank id before
+any request is made. Override `process_destroy_response(response)` to return
+something else, such as `true` or the receiver.
+
+Declaring `action :destroy` without the mixin only sets the route; it never
+generates a method. The name `delete` is not available for a custom action
+because every resource already has `Hash#delete`.
 
 ## API-wide defaults
 
@@ -192,7 +223,7 @@ classes load, or on the resource itself.
 
 An action's options are merged lowest priority first:
 
-1. REST built-in defaults, for the four reserved names.
+1. REST built-in defaults, for the five reserved names.
 2. The module's `action_defaults`.
 3. The module's `action` declaration for that name.
 4. Each ancestor resource class's declaration, farthest first.
@@ -273,6 +304,8 @@ The built-ins expose their routed paths as overridable methods too:
 | `list_resource_path(params)` (class) | `list` |
 | `save_resource_path` (instance) | `save` |
 | `save_params` (instance) | `save`; `as_save_json` plus the id param when `update` uses `id: :param` |
+| `destroy_resource_path` (instance) | `destroy` |
+| `destroy_params` (instance) | `destroy`; the id param when `destroy` uses `id: :param` |
 | `id_param` (class) | the default id param for every member action on the class |
 
 The instance method `resource_path` is unchanged. It still means "this record's
