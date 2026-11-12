@@ -107,6 +107,7 @@ The convention is a default. Any credential option also takes a Symbol naming a 
 | Scheme | Expects | Options | Sends |
 |---|---|---|---|
 | `:api_key` | `api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
+| `:basic` | `username`, `password` | `username:`, `password:` | `Authorization: Basic …` |
 
 ### The lifecycle
 
