@@ -231,6 +231,10 @@ class User < ApiResource
 end
 ```
 
+`MyApi::Result` is created by `include Resteze` alongside `Object`, `Client`,
+`Response` and the other namespaced classes, so the name `Result` is reserved
+inside your API module from 0.5.0 on.
+
 `Result` never raises on body shape. A `204 No Content`, an empty body, or a
 non-JSON body with a non-JSON content type yields an empty `Result`; the raw
 parsed body is always at `result.http_response.data`.

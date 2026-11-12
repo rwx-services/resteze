@@ -27,6 +27,7 @@ When a module does `include Resteze`, the `included` block in `lib/resteze.rb` f
 - `MyApi::Client` — Faraday-based HTTP client (thread-safe via `Thread.current`)
 - `MyApi::ApiResource` — extends Object with `retrieve`, `resource_path`, `refresh`
 - `MyApi::ListObject` — Hashie::Array subclass for paginated list responses
+- `MyApi::Result` — Hashie::Mash subclass returned by custom actions that declare no `returns:`
 - `MyApi::Middleware::RaiseError` — Faraday middleware for HTTP error handling
 - `MyApi::List`, `MyApi::Save` — mixins consumers include on specific resources
 - `MyApi::Error` and all subclasses — namespaced error hierarchy

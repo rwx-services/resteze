@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - `Response.parse_body` returns a blank body unparsed instead of raising `JSON::ParserError`, so a `200 OK` with an empty body no longer fails.
+- `include Resteze` now defines `MyApi::Result`, so `Result` joins `Object`, `Client`, `Response` and the other reserved constant names inside an API module.
 
 ## [0.3.1]
 
