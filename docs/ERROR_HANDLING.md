@@ -103,12 +103,13 @@ end
 ```
 
 ### RateLimitError
-`429 Too Many Requests`. `retry_after` reads the `Retry-After` header as seconds, accepting either delay-seconds or an HTTP-date, and is `nil` when the header is absent:
+`429 Too Many Requests`. `retry_after` reads the `Retry-After` header as seconds, accepting either delay-seconds or an HTTP-date, and is `nil` when the header is absent. `rate_limit` exposes the API's rate-limit headers (see [Rate Limits](CONFIGURATION.md#rate-limits)):
 
 ```ruby
 begin
   MyApi::Event.track(events: batch)
 rescue MyApi::RateLimitError => e
+  e.rate_limit&.remaining   # 0
   sleep(e.retry_after || 1)
   retry
 end
@@ -173,6 +174,7 @@ rescue MyApi::Error => e
   e.json_body     # Body parsed as JSON or XML, or nil
   e.response      # Faraday's response hash: { status:, headers:, body:, request: }
   e.cause         # The original Faraday error
+  e.rate_limit    # RateLimit from the response headers, or nil
 
   # For InvalidRequestError
   e.param         # The parameter that caused the error, when known
