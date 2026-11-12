@@ -1,3 +1,7 @@
+require "resteze/authenticating"
+require "resteze/instrumentation"
+require "resteze/rate_limiting"
+
 module Resteze
   class Client
     include Resteze::ApiModule

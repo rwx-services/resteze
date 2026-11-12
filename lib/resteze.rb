@@ -19,21 +19,22 @@ require "resteze/save"
 # API resource support classes
 require "resteze/object"
 
-# API Classes
+# API Classes (each file requires what it needs at load time, so this
+# list stays alphabetical)
+require "resteze/action"
+require "resteze/authenticating"
+require "resteze/authenticator"
+require "resteze/client"
+require "resteze/errors"
 require "resteze/instrumentation"
-require "resteze/synchronized_state"
+require "resteze/list_object"
 require "resteze/rate_limit"
 require "resteze/rate_limiter"
 require "resteze/rate_limiting"
-require "resteze/authenticator"
-require "resteze/authenticating"
-require "resteze/client"
-require "resteze/errors"
-require "resteze/list_object"
 require "resteze/response"
 require "resteze/result"
+require "resteze/synchronized_state"
 require "resteze/util"
-require "resteze/action"
 
 # Middlewares
 require "resteze/middleware/raise_error"

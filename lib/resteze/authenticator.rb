@@ -1,3 +1,5 @@
+require "resteze/synchronized_state"
+
 module Resteze
   # The interface through which a client describes how its API
   # authenticates requests. Resteze ships no credentials and assumes no

@@ -1,3 +1,5 @@
+require "resteze/synchronized_state"
+
 module Resteze
   # The interface through which a client describes, and responds to, its
   # API's rate limiting. Resteze assumes nothing about the mechanics: every
