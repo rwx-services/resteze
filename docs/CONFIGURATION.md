@@ -158,7 +158,7 @@ module MyApi
 end
 ```
 
-OAuth 2.0 and signed JWTs fit the same shape but need extra dependencies, so they are meant to ship as separate gems providing a `Strategy` subclass. Until then, hand an externally obtained token to `:bearer` through a callable.
+A token the application obtains by some other means can be handed to `:bearer` through a callable.
 
 `MyApi.authenticator` is the instance the client uses; assign another to replace it (tests do this to swap credentials) or `nil` to restore the default. `Client#request_headers` remains overridable for headers that are not a credential.
 

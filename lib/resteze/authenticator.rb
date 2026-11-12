@@ -44,9 +44,7 @@ module Resteze
   #
   # Each built-in is a subclass of Resteze::Authenticator::Strategy, and a
   # custom scheme is the same: subclass it, implement `apply`, and pass the
-  # class to `strategy`. Schemes that fetch or sign tokens (OAuth 2.0, JWT)
-  # need extra dependencies and are meant to live in their own gems as
-  # further Strategy subclasses.
+  # class to `strategy`.
   #
   # State lives in a mutex-guarded hash (`state`, `update_state`,
   # `synchronize`) shared by the strategies, so a strategy that caches a

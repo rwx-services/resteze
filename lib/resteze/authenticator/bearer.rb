@@ -2,8 +2,8 @@ module Resteze
   class Authenticator
     # A token in the Authorization header, "Bearer <token>" by default.
     # Use `scheme:` for APIs that want another prefix, such as "Token".
-    # A token obtained elsewhere (an OAuth flow the application ran, say)
-    # fits here through a callable.
+    # A token the application obtained some other way fits here through a
+    # callable.
     #
     #   strategy :bearer, token: -> { MyApi.api_key }
     #   strategy :bearer, token: -> { TokenStore.current }, scheme: "Token"
