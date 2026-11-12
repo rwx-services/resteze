@@ -1,7 +1,7 @@
 module Resteze
-  # Rate-limit state reported by an API's response headers. Built by
-  # Response#rate_limit and Error#rate_limit from the header names in the
-  # module's `rate_limit_headers` configuration.
+  # Optional helper for the common rate-limit shape: three integer headers
+  # for the quota, the remaining calls and the reset. Nothing in Resteze
+  # calls it; a module's Response.rate_limit_from hook may.
   class RateLimit
     DEFAULT_HEADERS = {
       limit: "X-RateLimit-Limit",

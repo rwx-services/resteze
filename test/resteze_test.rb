@@ -149,7 +149,7 @@ class RestezeTest < Minitest::Spec
     assert_config_property(:open_timeout, 30)
     assert_config_property(:read_timeout, 45)
     assert_config_property(:proxy)
-    assert_config_property(:rate_limit_headers, { limit: "L", remaining: "R", reset: "S" })
+    assert_config_property(:rate_limiter, Resteze::RateLimiter.new)
   end
 
   it "should support custom config properties" do
@@ -226,6 +226,8 @@ class RestezeTest < Minitest::Spec
         InvalidRequestError
         ApiConnectionError
         ApiError
+        RateLimitError
+        RateLimiter
         NotImplementedError
         ResourceNotFound
         UnprocessableEntityError

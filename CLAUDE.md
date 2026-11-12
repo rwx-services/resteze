@@ -31,6 +31,7 @@ When a module does `include Resteze`, the `included` block in `lib/resteze.rb` f
 - `MyApi::Middleware::RaiseError` — Faraday middleware for HTTP error handling
 - `MyApi::List`, `MyApi::Save` — mixins consumers include on specific resources
 - `MyApi::Error` and all subclasses — namespaced error hierarchy
+- `MyApi::RateLimiter` — per-module `Resteze::RateLimiter` subclass; `MyApi.rate_limiter` is the thread-shared instance the client consults (`before_request`, `track`, `retry?`, `retry_after`, `rate_limit`). `strategy :fixed_window | :sliding_window | :token_bucket | :leaky_bucket, **options` picks a built-in algorithm (`lib/resteze/rate_limiter/`); `Resteze::RateLimiting` is prepended outermost on `Client` to drive it and retry
 
 This means each consuming gem gets its own isolated class hierarchy; errors from one API won't be caught by rescue clauses for another.
 

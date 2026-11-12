@@ -22,6 +22,7 @@ module Resteze
 
       it "is nil when none of the headers are present" do
         assert_nil Resteze::RateLimit.from_headers({})
+        assert_nil Resteze::RateLimit.from_headers(nil)
         assert_nil Resteze::RateLimit.from_headers("Content-Type" => "application/json")
       end
 
@@ -33,16 +34,12 @@ module Resteze
         assert_nil rate_limit.reset
       end
 
-      it "accepts custom header names" do
-        names = { limit: "RateLimit-Limit", remaining: "RateLimit-Remaining", reset: "RateLimit-Reset" }
-        rate_limit = Resteze::RateLimit.from_headers({ "RateLimit-Remaining" => "7" }, names)
+      it "accepts other header names, keeping the defaults for names not given" do
+        rate_limit = Resteze::RateLimit.from_headers({ "RateLimit-Remaining" => "7", "X-RateLimit-Limit" => "9" },
+                                                     remaining: "RateLimit-Remaining")
 
         assert_equal 7, rate_limit.remaining
-        assert_nil Resteze::RateLimit.from_headers(HEADERS, names)
-      end
-
-      it "falls back to the defaults when names are nil" do
-        assert_equal 249_990, Resteze::RateLimit.from_headers(HEADERS, nil).remaining
+        assert_equal 9, rate_limit.limit
       end
     end
 
@@ -60,55 +57,53 @@ module Resteze
       end
     end
 
-    describe "Response#rate_limit" do
-      subject { AcmeApi::Client.new }
-
-      it "is built from the response headers" do
+    describe "rate_limit readers" do
+      it "are nil with the default no-op limiter, even when X-RateLimit headers are present" do
         stub_request(:get, api_url("/widgets/1")).to_return(body: "{}", headers: HEADERS)
 
-        rate_limit = subject.execute_request(:get, "/widgets/1").rate_limit
+        assert_nil AcmeApi::Client.new.execute_request(:get, "/widgets/1").rate_limit
+        assert_nil AcmeApi::ApiError.new("boom").rate_limit
+        assert_nil Resteze::Response.new.rate_limit
+      end
 
+      it "ask the module's limiter, on responses" do
+        stub_request(:get, "http://body.example.com/users/1")
+          .to_return(body: '{"message":"success"}', headers: HEADERS)
+
+        rate_limit = BodyApi::Client.new.execute_request(:get, "/users/1").rate_limit
+
+        assert_kind_of Resteze::RateLimit, rate_limit
         assert_equal 249_990, rate_limit.remaining
       end
 
-      it "is nil when the API sends no rate-limit headers" do
-        stub_request(:get, api_url("/widgets/1")).to_return(body: "{}")
-
-        assert_nil subject.execute_request(:get, "/widgets/1").rate_limit
-      end
-
-      it "uses the module's configured header names" do
-        AcmeApi.rate_limit_headers = { limit: "L", remaining: "R", reset: "S" }
-        stub_request(:get, api_url("/widgets/1")).to_return(body: "{}", headers: { "R" => "5" }.merge(HEADERS))
-
-        rate_limit = subject.execute_request(:get, "/widgets/1").rate_limit
-
-        assert_equal 5, rate_limit.remaining
-        assert_nil rate_limit.limit
-      ensure
-        AcmeApi.rate_limit_headers = Resteze::RateLimit::DEFAULT_HEADERS
-      end
-    end
-
-    describe "Error#rate_limit" do
-      it "is built from the error's headers" do
-        stub_request(:get, api_url("/widgets/1"))
+      it "ask the module's limiter, on errors" do
+        BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) { def retry?(*) = false }.new
+        stub_request(:get, "http://body.example.com/users/1")
           .to_return(status: 429, headers: HEADERS.merge("X-RateLimit-Remaining" => "0", "Retry-After" => "12"))
 
-        error = assert_raises(AcmeApi::RateLimitError) { AcmeApi::Client.new.execute_request(:get, "/widgets/1") }
+        error = assert_raises(BodyApi::RateLimitError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
 
         assert_predicate error.rate_limit, :exhausted?
         assert_equal 12, error.retry_after
-      end
-
-      it "is nil without headers" do
-        assert_nil AcmeApi::ApiError.new("boom").rate_limit
+      ensure
+        BodyApi.rate_limiter = nil
       end
     end
 
-    describe "configuration" do
-      it "defaults rate_limit_headers to the X-RateLimit names" do
-        assert_equal Resteze::RateLimit::DEFAULT_HEADERS, AcmeApi.rate_limit_headers
+    describe "RateLimitError#retry_after" do
+      it "reads the HTTP Retry-After header" do
+        assert_equal 4, AcmeApi::RateLimitError.new("slow", http_headers: { "retry-after" => "4" }).retry_after
+      end
+
+      it "can be redefined per module" do
+        klass = Class.new(AcmeApi::RateLimitError) do
+          def retry_after
+            header("X-Retry-In")&.to_i || super
+          end
+        end
+
+        assert_equal 9, klass.new("slow", http_headers: { "X-Retry-In" => "9", "Retry-After" => "99" }).retry_after
+        assert_equal 99, klass.new("slow", http_headers: { "Retry-After" => "99" }).retry_after
       end
     end
   end

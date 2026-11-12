@@ -79,10 +79,10 @@ module Resteze
       (200..299).cover?(http_status)
     end
 
-    # Rate-limit state from the response headers named by the module's
-    # `rate_limit_headers`, or nil when the API sent none.
+    # Whatever the module's RateLimiter makes of this response (see
+    # Resteze::RateLimiter#rate_limit), or nil.
     def rate_limit
-      @rate_limit ||= RateLimit.from_headers(http_headers, api_module.try(:rate_limit_headers))
+      @rate_limit ||= api_module.try(:rate_limiter)&.rate_limit(self)
     end
   end
 end

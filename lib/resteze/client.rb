@@ -2,6 +2,7 @@ module Resteze
   class Client
     include Resteze::ApiModule
     prepend Resteze::Instrumentation
+    prepend Resteze::RateLimiting
 
     def self.user_agent
       [

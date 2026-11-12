@@ -538,45 +538,93 @@ end
 
 ## Rate Limits
 
-### Reading rate-limit headers
+### The RateLimiter
 
-Every `Response` and every `MyApi::Error` exposes `rate_limit`, built from the response headers. It is `nil` when the API sent none of them.
+APIs disagree about rate limits: which headers carry the quota, whether the reset is an epoch or a countdown, whether a 429 is the only signal, whether the client should pace itself or just react. Resteze assumes none of it. `include Resteze` gives your module a `MyApi::RateLimiter`, a subclass of `Resteze::RateLimiter` whose every method is a no-op, and the client calls one instance of it, shared by every thread, at fixed points in each request:
 
-```ruby
-response = MyApi::User.request(:get, '/users')
-response.rate_limit.limit       # 250000
-response.rate_limit.remaining   # 249990
-response.rate_limit.reset       # as sent by the API: an epoch for Braze and GitHub,
-                                # seconds-until for the IETF RateLimit draft
-response.rate_limit.exhausted?  # remaining == 0
+| Called | When | Default |
+|---|---|---|
+| `before_request(method, path, params:, headers:)` | before sending | waits for the strategy, if one is configured |
+| `track(response_or_error)` | after every `Response` and every `MyApi::Error` | lets the strategy learn from the API |
+| `retry?(error, attempt)` | after a `MyApi::RateLimitError`; `attempt` starts at 1 | `false` |
+| `retry_after(error)` | before a retry | the error's `Retry-After` |
+| `rate_limit(response_or_error)` | when `rate_limit` is read on a response or error | the strategy's view, else `nil` |
 
-begin
-  MyApi::Event.track(events: batch)
-rescue MyApi::RateLimitError => e
-  e.rate_limit.remaining   # 0
-  e.retry_after            # seconds from the Retry-After header, or nil
-end
-```
+The instance is `MyApi.rate_limiter`; assign one to replace it. Each attempt of a retried request is logged and instrumented on its own.
 
-The default header names are `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, matched case-insensitively. Configure different names per module; keys you leave out keep their defaults:
+### Choosing a strategy
+
+The four common algorithms are built in. Pick one with `strategy` in your module's `RateLimiter`:
 
 ```ruby
-module MyApi
-  include Resteze
-
-  configure do |config|
-    config.rate_limit_headers = {
-      limit: 'RateLimit-Limit',
-      remaining: 'RateLimit-Remaining',
-      reset: 'RateLimit-Reset'
-    }
+module Braze
+  class RateLimiter
+    strategy :fixed_window, limit: 250_000, window: 3600, headers: true
   end
 end
 ```
 
+| Strategy | Options | Behaviour |
+|---|---|---|
+| `:fixed_window` | `limit:`, `window:` seconds, `headers:`, `reset:` | At most `limit` requests per window, windows aligned to the first request. With `headers: true` the count and window follow the API's `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers, which is how Braze and JD Power report theirs; pass a Hash to name other headers, and `reset: :seconds` when the reset header is a countdown rather than a time. `limit:` may be omitted when the API sends it |
+| `:sliding_window` | `limit:`, `window:` seconds | At most `limit` requests in any trailing window. Exact; memory bounded by `limit` |
+| `:token_bucket` | `capacity:`, `refill_rate:` per second | Bursts up to `capacity`, then paced at the refill rate |
+| `:leaky_bucket` | `capacity:`, `leak_rate:` per second | Smooths bursts into a steady rate; a full bucket waits for room |
+
+With a strategy, `before_request` waits until the request fits, outside the lock so one thread's wait never blocks another's bookkeeping, and `rate_limit` on any response or error returns a `Resteze::RateLimit` (`limit`, `remaining`, `reset`, `exhausted?`) of the strategy's current view. For your own algorithm, subclass `Resteze::RateLimiter::Strategy`, implement `acquire(state, now)` to return `0` to admit a request or the seconds until one could be admitted, and pass the class to `strategy`.
+
+### Reacting to a 429
+
+A strategy keeps you under the limit; `retry?` and `retry_after` say what to do when the API disagrees. Override them alongside, or instead of, a strategy:
+
+```ruby
+module Braze
+  class RateLimiter
+    strategy :fixed_window, limit: 250_000, window: 3600, headers: true
+
+    def retry?(_error, attempt)
+      attempt <= 3
+    end
+  end
+end
+```
+
+`retry_after` reads the HTTP `Retry-After` header, accepting delay-seconds or an HTTP-date. For an API that signals the wait another way, override it; `header` does a case-insensitive lookup on the error:
+
+```ruby
+def retry_after(error)
+  error.header('X-Retry-In')&.to_i || super
+end
+```
+
+### Overriding the lifecycle
+
+Any method can be overridden; call `super` to keep the strategy's behaviour. State belongs in the limiter's mutex-guarded hash, never in instance variables, so a subclass stays thread-safe without doing anything: `state` returns a snapshot, `update_state` merges values, and `synchronize { |state| ... }` yields the live hash for read-modify-write sequences.
+
+```ruby
+module Braze
+  class RateLimiter
+    strategy :fixed_window, limit: 250_000, window: 3600, headers: true
+
+    def before_request(method, path, **)
+      raise RateLimitError, "budget reserved for exports" if path.start_with?("/users/export") && state[:remaining].to_i < 1000
+
+      super
+    end
+
+    def track(response)
+      super
+      update_state(remaining: response.rate_limit&.remaining)
+    end
+  end
+end
+```
+
+`Resteze::RateLimit.from_headers(headers, names = {})` remains available as a helper for reading the three-header shape by hand.
+
 ### Retrying after a 429
 
-Resteze raises `MyApi::RateLimitError` for a 429 and leaves retrying to you. For automatic retries, add the [`faraday-retry`](https://github.com/lostisland/faraday-retry) gem (it is not a Resteze dependency) and place it **after** `RaiseError` in the stack. That puts it closer to the adapter, so it sees the raw 429 and retries before `RaiseError` turns the final answer into an error. `retry_statuses: [429]` makes it honor `Retry-After` automatically.
+Resteze retries a 429 only when your `RateLimiter`'s `retry?` says so. For retries handled below the limiter, with backoff and per-status rules, add the [`faraday-retry`](https://github.com/lostisland/faraday-retry) gem (it is not a Resteze dependency) and place it **after** `RaiseError` in the stack. That puts it closer to the adapter, so it sees the raw 429 and retries before `RaiseError` turns the final answer into an error. `retry_statuses: [429]` makes it honor `Retry-After` automatically.
 
 ```ruby
 require 'faraday/retry'
