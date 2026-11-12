@@ -111,7 +111,7 @@ end
 | `:bearer` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
 | `:mtls` | `cert:`, `key:`, `ca_file:`, `passphrase:`, `verify:` | a client certificate on the TLS connection |
 
-Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.) `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
+Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.) `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
 
 ### The lifecycle
 

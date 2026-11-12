@@ -6,11 +6,15 @@ module Resteze
     # made. `cert:` and `key:` are PEM strings, paths to PEM files, or
     # callables returning either; `ca_file:` is a path to the CA bundle
     # that verifies the server, when the system store is not enough.
-    # Nothing is added to requests; the credential lives in the
-    # connection, so a client that overrides `default_connection` must
-    # pass `connection_options` to Faraday itself.
+    # Paths are read as given when the connection is first built, so a
+    # relative one resolves against the process's working directory at
+    # that moment; use absolute paths (Rails.root.join, File.expand_path)
+    # or supply PEM text. Nothing is added to requests; the credential
+    # lives in the connection, so a client that overrides
+    # `default_connection` must pass `connection_options` to Faraday itself.
     #
-    #   strategy :mtls, cert: "config/client.pem", key: "config/client-key.pem"
+    #   strategy :mtls, cert: Rails.root.join("config/certs/client.pem"),
+    #                   key:  Rails.root.join("config/certs/client-key.pem")
     #   strategy :mtls, cert: -> { MyApi.client_cert }, key: -> { MyApi.client_key },
     #                   passphrase: -> { MyApi.client_key_passphrase }, ca_file: "config/ca.pem"
     class Mtls < Strategy
