@@ -86,12 +86,12 @@ module Resteze
         assert_equal "req_404", payload[:request_id]
       end
 
-      it "populates status and request_id from a Faraday error response" do
+      it "populates status and request_id from a mapped error response" do
         stub_request(:get, api_url("/widgets/limited"))
           .to_return(status: 429, headers: { "Request-Id" => "req_429" })
 
         events = capture_events("request.acme_api") do
-          assert_raises(Faraday::TooManyRequestsError) do
+          assert_raises(AcmeApi::RateLimitError) do
             subject.execute_request(:get, "/widgets/limited")
           end
         end
@@ -123,7 +123,7 @@ module Resteze
         stub_request(:get, api_url("/widgets/down")).to_raise(Errno::ECONNREFUSED)
 
         events = capture_events("request.acme_api") do
-          assert_raises(Faraday::ConnectionFailed) do
+          assert_raises(AcmeApi::ApiConnectionError) do
             subject.execute_request(:get, "/widgets/down")
           end
         end
