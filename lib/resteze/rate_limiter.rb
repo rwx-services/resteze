@@ -169,7 +169,7 @@ module Resteze
         seconds = synchronize { |state| strategy.acquire(state, now) }
         break if seconds <= 0
 
-        waited += wait(seconds)
+        waited += wait(seconds, reason: :throttle)
       end
       waited
     end
@@ -177,13 +177,21 @@ module Resteze
     # Honours on_wait and max_wait for a wait of `seconds`: sleeps through
     # the injectable sleeper and returns the seconds slept, or raises
     # `error` (default: a fresh MyApi::RateLimitError carrying the wait in
-    # retry_after) under on_wait: :raise.
-    def wait(seconds, error: nil)
+    # retry_after) under on_wait: :raise. Either way it fires a
+    # `rate_limit.wait.<key>` notification whose duration is the time spent
+    # waiting and whose payload says why (`reason`: :throttle or :retry,
+    # `attempt` for a retry, `seconds`, `on_wait`); a raised wait carries the
+    # exception keys ActiveSupport adds.
+    def wait(seconds, error: nil, reason: :throttle, attempt: nil)
       seconds = clamp(seconds)
-      raise(error || wait_error(seconds)) if on_wait == :raise
+      payload = { api_module: api_module.name, seconds:, reason:, attempt:, on_wait: }.compact
 
-      @sleeper.call(seconds) if seconds.positive?
-      seconds
+      ActiveSupport::Notifications.instrument("rate_limit.wait.#{instrumentation_key}", payload) do
+        raise(error || wait_error(seconds)) if on_wait == :raise
+
+        @sleeper.call(seconds) if seconds.positive?
+        seconds
+      end
     end
 
     # A deep-copied snapshot of the limiter's state.
@@ -214,6 +222,13 @@ module Resteze
       return max_wait.to_f unless seconds.finite?
 
       seconds.clamp(0.0, max_wait.to_f)
+    end
+
+    # The module's INSTRUMENTATION_KEY, or its underscored name for a bare
+    # Resteze::RateLimiter that serves no module.
+    def instrumentation_key
+      mod = api_module
+      mod.const_defined?(:INSTRUMENTATION_KEY, false) ? mod::INSTRUMENTATION_KEY : mod.name.underscore.tr("/", "_")
     end
 
     def wait_error(seconds)

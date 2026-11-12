@@ -107,6 +107,19 @@ ActiveSupport::Notifications.subscribe("request.my_cool_api") do |event|
   event.payload[:request_id] # value of the Request-Id response header
   event.payload[:api_module] # "MyCoolApi"
   event.payload[:exception]  # [ExceptionClass, message] if the request raised
+  event.payload[:rate_limit] # { limit:, remaining:, reset: } when the module's RateLimiter reports one
+end
+```
+
+A second event, `rate_limit.<key>` prefixed as `rate_limit.wait.<key>`, fires whenever the module's `RateLimiter` makes a request wait, before sending or before a retry. Its `duration` is the time actually spent waiting; its payload carries `seconds` (the wait asked for), `reason` (`:throttle` or `:retry`), `attempt` for a retry, and `on_wait`. Under `on_wait: :raise` the event still fires and carries the raised exception, so refused requests are visible too:
+
+```ruby
+ActiveSupport::Notifications.subscribe("rate_limit.wait.my_cool_api") do |event|
+  event.duration            # milliseconds actually waited
+  event.payload[:seconds]   # 30.0
+  event.payload[:reason]    # :throttle or :retry
+  event.payload[:attempt]   # 1, 2, … for :retry
+  event.payload[:exception] # set when on_wait: :raise refused the request instead
 end
 ```
 
