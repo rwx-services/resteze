@@ -571,7 +571,55 @@ end
 | `:token_bucket` | `capacity:`, `refill_rate:` per second | Bursts up to `capacity`, then paced at the refill rate |
 | `:leaky_bucket` | `capacity:`, `leak_rate:` per second | Smooths bursts into a steady rate; a full bucket waits for room |
 
-With a strategy, `before_request` waits until the request fits, outside the lock so one thread's wait never blocks another's bookkeeping, and `rate_limit` on any response or error returns a `Resteze::RateLimit` (`limit`, `remaining`, `reset`, `exhausted?`) of the strategy's current view. For your own algorithm, subclass `Resteze::RateLimiter::Strategy`, implement `acquire(state, now)` to return `0` to admit a request or the seconds until one could be admitted, and pass the class to `strategy`.
+With a strategy, `before_request` waits until the request fits, outside the lock so one thread's wait never blocks another's bookkeeping, and `rate_limit` on any response or error returns a `Resteze::RateLimit` (`limit`, `remaining`, `reset`, `exhausted?`) of the strategy's current view. For your own algorithm, subclass `Resteze::RateLimiter::Strategy` and pass the class to `strategy`; options after it go to your constructor. `acquire(state, now)` is required: record one request in `state` and return `0`, or record nothing and return the seconds until one could be admitted. `observe(state, response, now)` and `describe(state, now)` are optional. `state` is the limiter's hash, already under its lock, and the strategy itself must stay stateless. A daily quota aligned to midnight UTC:
+
+```ruby
+module MyApi
+  class DailyQuota < Resteze::RateLimiter::Strategy
+    DAY = 86_400
+
+    def initialize(limit:)
+      super()
+      @limit = limit
+    end
+
+    def acquire(state, now)
+      roll(state, now)
+      return (state[:day_started] + DAY) - now if state[:count] >= @limit
+
+      state[:count] += 1
+      0
+    end
+
+    def observe(state, response, now)
+      data = response.respond_to?(:data) ? response.data : response.json_body
+      return unless data.is_a?(Hash) && data[:calls_remaining]
+
+      roll(state, now)
+      state[:count] = @limit - data[:calls_remaining].to_i
+    end
+
+    def describe(state, now)
+      roll(state, now)
+      Resteze::RateLimit.new(limit: @limit, remaining: @limit - state[:count], reset: state[:day_started] + DAY)
+    end
+
+    private
+
+    def roll(state, now)
+      today = now - (now % DAY)
+      return if state[:day_started] == today
+
+      state[:day_started] = today
+      state[:count]       = 0
+    end
+  end
+
+  class RateLimiter
+    strategy DailyQuota, limit: 10_000
+  end
+end
+```
 
 ### Reacting to a 429
 
