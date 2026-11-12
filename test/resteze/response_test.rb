@@ -84,5 +84,34 @@ module Resteze
         assert_equal Mime::Type.lookup("text/html"), subject.mime_type("content-type" => "text/html; charset=utf8")
       end
     end
+
+    describe "#ok?" do
+      it "is true only for a 200" do
+        assert_predicate response_with_status(200), :ok?
+        refute_predicate response_with_status(201), :ok?
+        refute_predicate response_with_status(204), :ok?
+        refute_predicate response_with_status(404), :ok?
+      end
+    end
+
+    describe "#success?" do
+      it "is true for any 2xx status" do
+        assert_predicate response_with_status(200), :success?
+        assert_predicate response_with_status(201), :success?
+        assert_predicate response_with_status(204), :success?
+        assert_predicate response_with_status(299), :success?
+      end
+
+      it "is false outside the 2xx range" do
+        refute_predicate response_with_status(199), :success?
+        refute_predicate response_with_status(302), :success?
+        refute_predicate response_with_status(404), :success?
+        refute_predicate response_with_status(nil), :success?
+      end
+    end
+
+    def response_with_status(status)
+      subject.new.tap { |response| response.http_status = status }
+    end
   end
 end

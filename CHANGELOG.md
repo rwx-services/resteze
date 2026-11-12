@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - `Result`, a loose Mash returned by custom actions by default; `returns:` selects a resource, a list, or any `Object` subclass instead.
 - `retrieve_resource_path`, `save_params` and `id_param` override points.
 - `has_action` assertion helper for Minitest and RSpec.
+- `Response#success?`, true for any 2xx status. `Response#ok?` is unchanged and means exactly 200, so a `201 Created` answers `success?` but not `ok?`.
 
 ### Changed
 
