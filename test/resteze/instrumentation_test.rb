@@ -119,6 +119,29 @@ module Resteze
         assert_equal "req_503", payload[:request_id]
       end
 
+      it "reads status from a raw Faraday error that bypassed the mapping middleware" do
+        raw = Faraday::ServerError.new("upstream", { status: 502, headers: { "Request-Id" => "req_502" }, body: "" })
+        stub_request(:get, api_url("/widgets/raw")).to_raise(raw)
+
+        events = capture_events("request.acme_api") do
+          assert_raises(Faraday::ServerError) { subject.execute_request(:get, "/widgets/raw") }
+        end
+
+        assert_equal 502,       events.first.payload[:status]
+        assert_equal "req_502", events.first.payload[:request_id]
+      end
+
+      it "leaves status unset for an error that is neither Faraday's nor Resteze's" do
+        stub_request(:get, api_url("/widgets/odd")).to_raise(RuntimeError.new("odd"))
+
+        events = capture_events("request.acme_api") do
+          assert_raises(RuntimeError) { subject.execute_request(:get, "/widgets/odd") }
+        end
+
+        refute events.first.payload.key?(:status)
+        assert_equal "RuntimeError", events.first.payload[:exception].first
+      end
+
       it "leaves status unset when the error carries no response" do
         stub_request(:get, api_url("/widgets/down")).to_raise(Errno::ECONNREFUSED)
 

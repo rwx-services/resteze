@@ -17,20 +17,25 @@ module Resteze
     # for any options that should read settings, and pass the class to
     # `authenticate_with` with its options.
     class Strategy
-      # Scheme name => class, for `authenticate_with :name`. Each built-in
-      # scheme registers itself here.
-      BUILT_IN = {}.freeze
-
       # Option defaults; Symbol values are settings read from the module.
       DEFAULTS = {}.freeze
 
       attr_accessor :api_module
 
-      def self.lookup(name)
-        class_name = BUILT_IN[name.to_sym] or
-          raise ArgumentError, "unknown authentication strategy #{name.inspect}; known: #{BUILT_IN.keys.join(', ')}"
+      # Names a scheme for `authenticate_with :name`. Each built-in registers
+      # itself; a gem providing a scheme can do the same.
+      def self.register(name, klass)
+        registry[name.to_sym] = klass
+      end
 
-        class_name.constantize
+      def self.registry
+        @registry ||= {}
+      end
+
+      def self.lookup(name)
+        registry.fetch(name.to_sym) do
+          raise ArgumentError, "unknown authentication strategy #{name.inspect}; known: #{registry.keys.join(', ')}"
+        end
       end
 
       # The module settings these options (over the defaults) read.

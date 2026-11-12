@@ -144,6 +144,8 @@ module MyApi
 end
 ```
 
+`Resteze::Authenticator::Strategy.register(:session_token, SessionToken)` gives a scheme a name, so `authenticate_with :session_token` works like a built-in; a gem that ships a scheme registers it this way.
+
 `MyApi.authenticator` is the instance the client uses; assign another to replace it (tests do this to swap credentials) or `nil` to restore the default. `Client#request_headers` remains overridable for headers that are not a credential.
 
 ## Environment-based Configuration

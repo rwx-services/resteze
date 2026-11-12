@@ -133,6 +133,14 @@ module Resteze
         assert_equal error.http_headers, error.response_headers
       end
 
+      it "leaves json_body nil when the body claims JSON but does not parse" do
+        faraday = faraday_error(body: "<html>", headers: { "Content-Type" => "application/json" })
+        error   = Resteze::ApiError.from_faraday(faraday)
+
+        assert_nil error.json_body
+        assert_equal "<html>", error.http_body
+      end
+
       it "tolerates an error with no response" do
         error = Resteze::ApiConnectionError.from_faraday(Faraday::ConnectionFailed.new("refused"))
 

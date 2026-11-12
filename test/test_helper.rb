@@ -179,7 +179,7 @@ class HeaderKey < Resteze::Authenticator::Strategy
 
   def initialize(value: :api_key, header: "X-Api-Key")
     super()
-    @value  = value
+    @value  = Resteze::Authenticator::Strategy.required!(:value, value)
     @header = header
   end
 

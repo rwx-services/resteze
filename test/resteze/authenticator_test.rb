@@ -79,9 +79,21 @@ module Resteze
         assert_equal "o", req.headers["X-Other"]
       end
 
-      it "rejects unknown names and options without a name" do
+      it "rejects unknown names, options without a name, and a nil required option" do
         assert_raises(ArgumentError) { Class.new(Resteze::Authenticator) { strategy :unknown_scheme, value: "x" } }
         assert_raises(ArgumentError) { Class.new(Resteze::Authenticator) { strategy(header: "X") } }
+        assert_raises(ArgumentError) { HeaderKey.new(value: nil) }
+      end
+
+      it "resolves a registered name to its class" do
+        Authenticator::Strategy.register(:header_key, HeaderKey)
+
+        klass = Class.new(Resteze::Authenticator) { strategy :header_key, value: "k" }
+
+        assert_equal HeaderKey, Authenticator::Strategy.lookup("header_key")
+        assert_equal [HeaderKey, { value: "k" }], klass.strategy.first
+      ensure
+        Authenticator::Strategy.registry.delete(:header_key)
       end
 
       it "keeps state across calls for a strategy that uses it" do
@@ -114,6 +126,13 @@ module Resteze
         assert_equal %i[partner_key], HeaderKey.settings(value: :partner_key)
         assert_empty HeaderKey.settings(value: -> { "k" })
         assert_empty Authenticator::Strategy.settings
+      end
+
+      it "reports an instance's settings from DEFAULTS when a scheme declares no credential options" do
+        with_defaults = Class.new(Authenticator::Strategy) { const_set(:DEFAULTS, { token: :api_token }.freeze) }
+
+        assert_equal %i[api_token], with_defaults.new.settings
+        assert_empty Authenticator::Strategy.new.settings
       end
 
       it "reads the setting on every request, so a rotated credential takes effect" do

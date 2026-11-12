@@ -223,6 +223,18 @@ module Resteze
         end
       end
 
+      describe Strategy do
+        it "admits everything, learns nothing and describes nothing by default" do
+          strategy = Strategy.new
+          state = {}
+
+          assert_equal 0, strategy.acquire(state, 1_000.0)
+          assert_nil strategy.observe(state, response_with({}), 1_000.0)
+          assert_nil strategy.describe(state, 1_000.0)
+          assert_empty state
+        end
+      end
+
       describe "the strategy macro" do
         it "configures instances of the limiter class and its subclasses" do
           klass = Class.new(Resteze::RateLimiter) { strategy :token_bucket, capacity: 5, refill_rate: 1 }
