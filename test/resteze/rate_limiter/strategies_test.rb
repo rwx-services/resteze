@@ -187,6 +187,34 @@ module Resteze
           assert_equal [2.0], time.sleeps
         end
 
+        it "raises instead of waiting with on_wait: :raise, carrying the wait in retry_after" do
+          klass = Class.new(Resteze::RateLimiter) { strategy :fixed_window, limit: 1, window: 45, on_wait: :raise }
+          time = FakeTime.new
+          limiter = klass.new(clock: time.clock, sleeper: time.sleeper)
+
+          assert_equal 0, limiter.throttle
+          error = assert_raises(Resteze::RateLimitError) { limiter.throttle }
+
+          assert_equal 45, error.retry_after
+          assert_nil error.http_status
+          assert_empty time.sleeps
+        end
+
+        it "inherits on_wait from the limiter class" do
+          klass = Class.new(Resteze::RateLimiter) { strategy :fixed_window, limit: 1, window: 45, on_wait: :raise }
+
+          assert_equal :raise, klass.on_wait
+          assert_equal :raise, klass.new.on_wait
+          assert_equal :raise, Class.new(klass).on_wait
+        end
+
+        it "takes on_wait from the constructor too, and rejects other values" do
+          assert_equal :raise, Resteze::RateLimiter.new(on_wait: :raise).on_wait
+          assert_equal :sleep, Resteze::RateLimiter.new.on_wait
+          assert_raises(ArgumentError) { Resteze::RateLimiter.new(on_wait: :enqueue) }
+          assert_raises(ArgumentError) { Class.new(Resteze::RateLimiter) { strategy :token_bucket, capacity: 1, refill_rate: 1, on_wait: :block } }
+        end
+
         it "leaves the limiter a no-op without one" do
           limiter = Resteze::RateLimiter.new
 

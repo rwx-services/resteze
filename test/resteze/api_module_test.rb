@@ -1,6 +1,16 @@
 require "test_helper"
 
 module Resteze
+  class AnonymousApiModuleTest < Minitest::Spec
+    it "resolves an anonymous subclass through its named parent" do
+      assert_equal AcmeApi, Class.new(AcmeApi::Widget).api_module
+      assert_equal AcmeApi, Class.new(AcmeApi::RateLimiter).new.api_module
+      assert_equal Resteze, Class.new(Resteze::Response).api_module
+    end
+  end
+end
+
+module Resteze
   class ApiModuleTest < Minitest::Spec
     module AwesomeApi
       include Resteze

@@ -52,16 +52,33 @@ module Resteze
   # sequences. Avoid instance variables. Waiting always happens outside the
   # lock, so one thread's wait never blocks another thread's bookkeeping.
   class RateLimiter
+    include Resteze::ApiModule
+
     class << self
       # Chooses the built-in strategy (by name) or a custom Strategy class
       # that instances of this limiter use. Without arguments, returns the
       # configured [class, options] pair or nil.
-      def strategy(name = nil, **options)
+      #
+      # `on_wait:` says what to do when the strategy cannot admit a request
+      # yet: `:sleep` (the default) waits in the calling thread; `:raise`
+      # raises MyApi::RateLimitError with the wait in `retry_after`, for
+      # callers such as background jobs that would rather reschedule.
+      def strategy(name = nil, on_wait: nil, **options)
         return @strategy if name.nil?
 
         klass = name.is_a?(Class) ? name : Strategy.lookup(name)
         @strategy = [klass, options]
+        @on_wait  = ON_WAIT.include?(on_wait) ? on_wait : raise_on_wait(on_wait) if on_wait
         nil
+      end
+
+      # The configured on_wait, inherited from the superclass; :sleep by default.
+      def on_wait
+        @on_wait || (superclass.respond_to?(:on_wait) ? superclass.on_wait : :sleep)
+      end
+
+      def raise_on_wait(value)
+        raise ArgumentError, "on_wait: must be one of #{ON_WAIT.map(&:inspect).join(', ')}, got #{value.inspect}"
       end
 
       # The configured [class, options] pair, inherited from the superclass
@@ -76,12 +93,15 @@ module Resteze
       end
     end
 
-    attr_reader :strategy
+    ON_WAIT = %i[sleep raise].freeze
 
-    def initialize(strategy: self.class.strategy_instance, clock: nil, sleeper: nil)
+    attr_reader :strategy, :on_wait
+
+    def initialize(strategy: self.class.strategy_instance, on_wait: self.class.on_wait, clock: nil, sleeper: nil)
       @mutex    = Mutex.new
       @state    = {}
       @strategy = strategy
+      @on_wait  = ON_WAIT.include?(on_wait) ? on_wait : self.class.raise_on_wait(on_wait)
       @clock    = clock   || -> { Time.now.to_f }
       @sleeper  = sleeper || ->(seconds) { sleep(seconds) }
     end
@@ -119,10 +139,19 @@ module Resteze
         wait = synchronize { |state| strategy.acquire(state, now) }
         break if wait <= 0
 
+        raise_for_wait(wait) if on_wait == :raise
+
         @sleeper.call(wait)
         waited += wait
       end
       waited
+    end
+
+    # Raised instead of waiting under on_wait: :raise. The error carries the
+    # wait in retry_after and, like any refusal from before_request, has no
+    # HTTP status because nothing was sent.
+    def raise_for_wait(wait)
+      raise api_module::RateLimitError.new("rate limit reached; retry in #{wait.ceil} seconds", retry_after: wait.ceil)
     end
 
     # A snapshot of the limiter's state.

@@ -597,6 +597,32 @@ def retry_after(error)
 end
 ```
 
+### Waiting without blocking
+
+With a strategy, `before_request` waits in the calling thread by default (`on_wait: :sleep`). A background job would often rather give the thread back and reschedule itself. `on_wait: :raise` makes the limiter raise `MyApi::RateLimitError` instead of waiting, with the computed wait in `retry_after` and no `http_status`, since nothing was sent. An error raised this way never goes through `retry?`; it is a refusal, not a failed attempt.
+
+```ruby
+module Braze
+  class RateLimiter
+    strategy :fixed_window, limit: 250_000, window: 3600, headers: true, on_wait: :raise
+  end
+end
+
+class TrackEventsJob
+  include Sidekiq::Job
+
+  sidekiq_retry_in do |_count, exception|
+    exception.respond_to?(:retry_after) ? (exception.retry_after || 60) : :default
+  end
+
+  def perform(events)
+    Braze::User.track(events:)   # a spent budget, or a 429, raises; Sidekiq reschedules
+  end
+end
+```
+
+The same option is accepted by the constructor, `MyApi::RateLimiter.new(on_wait: :raise)`, and `RateLimitError.new(message, retry_after: seconds)` builds such an error by hand.
+
 ### Overriding the lifecycle
 
 Any method can be overridden; call `super` to keep the strategy's behaviour. State belongs in the limiter's mutex-guarded hash, never in instance variables, so a subclass stays thread-safe without doing anything: `state` returns a snapshot, `update_state` merges values, and `synchronize { |state| ... }` yields the live hash for read-modify-write sequences.

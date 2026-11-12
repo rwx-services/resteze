@@ -165,6 +165,20 @@ module Resteze
         assert_requested :get, URL, times: 2
       end
 
+      it "raises the module's RateLimitError under on_wait: :raise without sending or retrying" do
+        BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) do
+          strategy :fixed_window, limit: 1, window: 30, on_wait: :raise
+        end.new
+        stub_request(:get, URL).to_return(body: SUCCESS)
+
+        BodyApi::Client.new.execute_request(:get, "/users/1")
+        error = assert_raises(BodyApi::RateLimitError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
+
+        assert_equal 30, error.retry_after
+        assert_nil error.http_status
+        assert_requested :get, URL, times: 1 # the fixture's retry? would have said yes; refusals never retry
+      end
+
       it "lets before_request refuse a request before it is sent" do
         BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) do
           def before_request(*, **)

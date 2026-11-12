@@ -6,13 +6,20 @@ module Resteze
     def execute_request(method, path, headers: {}, params: {})
       limiter = api_module.rate_limiter
       attempt = 0
+      sent    = false
       begin
         limiter.before_request(method, path, params:, headers:)
+        sent = true
         super.tap { |response| limiter.track(response) }
       rescue api_module::Error => e
+        # A refusal from before_request never went out, so there is nothing
+        # to track and nothing to retry.
+        raise unless sent
+
         limiter.track(e)
         raise unless e.is_a?(api_module::RateLimitError) && limiter.retry?(e, attempt += 1)
 
+        sent = false
         wait_before_retry(limiter, e)
         retry
       end
