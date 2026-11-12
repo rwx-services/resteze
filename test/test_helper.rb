@@ -170,6 +170,57 @@ BodyApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
+# A scheme defined the way a built-in is: a Strategy subclass whose
+# DEFAULTS name the module setting it expects.
+class HeaderKey < Resteze::Authenticator::Strategy
+  DEFAULTS = { value: :api_key }.freeze
+
+  attr_reader :header
+
+  def initialize(value: :api_key, header: "X-Api-Key")
+    super()
+    @value  = Resteze::Authenticator::Strategy.required!(:value, value)
+    @header = header
+  end
+
+  def credential_options
+    { value: @value }
+  end
+
+  def apply(request, _state)
+    request.headers[header] = resolve!(:value, @value).to_s
+  end
+end
+
+# An API authenticated with a header key read from AuthApi.api_key.
+module AuthApi
+  include Resteze
+
+  authenticate_with HeaderKey # expects AuthApi.api_key
+
+  class Widget < ApiResource
+    include Save
+
+    property :id
+    property :name
+  end
+end
+
+AuthApi.configure do |config|
+  config.api_base = "http://auth.example.com/"
+  config.api_key  = "secret-key"
+  config.logger   = Logger.new(nil)
+end
+
+# Configured entirely through the module-level macros.
+module MacroApi
+  include Resteze
+
+  authenticate_with HeaderKey, value: "k"
+  authenticate_with HeaderKey, header: "X-Second", value: :second_key
+  rate_limit_with :token_bucket, capacity: 5, refill_rate: 1
+end
+
 def configure_gem!
   AcmeApi.configure do |config|
     config.api_base = "http://acme.example.com/"

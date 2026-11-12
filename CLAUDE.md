@@ -31,6 +31,7 @@ When a module does `include Resteze`, the `included` block in `lib/resteze.rb` f
 - `MyApi::Middleware::RaiseError` — Faraday middleware for HTTP error handling
 - `MyApi::List`, `MyApi::Save` — mixins consumers include on specific resources
 - `MyApi::Error` and all subclasses — namespaced error hierarchy
+- `MyApi::Authenticator` — per-module `Resteze::Authenticator` subclass; `MyApi.authenticator` is the thread-shared instance. `authenticate_with <name or Strategy class>, **options` on the module (or `strategy` inside the class; combinable) adds a `Resteze::Authenticator::Strategy` subclass; built-in schemes call `Strategy.register(:name, self)` (`lib/resteze/authenticator/`), and a gem can register its own. A strategy's `DEFAULTS` name the module settings it expects, which `authenticate_with` declares. `Resteze::Authenticating` is prepended on `Client` to call `apply(request)` before each request and retry once when `refresh?` says so; `connection_options` feed `Client.default_connection`
 - `MyApi::RateLimiter` — per-module `Resteze::RateLimiter` subclass; `MyApi.rate_limiter` is the thread-shared instance the client consults (`before_request`, `track`, `retry?`, `retry_after`, `rate_limit`). `strategy :fixed_window | :sliding_window | :token_bucket | :leaky_bucket, **options` picks a built-in algorithm (`lib/resteze/rate_limiter/`); `Resteze::RateLimiting` is prepended outermost on `Client` to drive it and retry
 
 This means each consuming gem gets its own isolated class hierarchy; errors from one API won't be caught by rescue clauses for another.

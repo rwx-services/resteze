@@ -19,18 +19,22 @@ require "resteze/save"
 # API resource support classes
 require "resteze/object"
 
-# API Classes
+# API Classes (each file requires what it needs at load time, so this
+# list stays alphabetical)
+require "resteze/action"
+require "resteze/authenticating"
+require "resteze/authenticator"
+require "resteze/client"
+require "resteze/errors"
 require "resteze/instrumentation"
+require "resteze/list_object"
 require "resteze/rate_limit"
 require "resteze/rate_limiter"
 require "resteze/rate_limiting"
-require "resteze/client"
-require "resteze/errors"
-require "resteze/list_object"
 require "resteze/response"
 require "resteze/result"
+require "resteze/synchronized_state"
 require "resteze/util"
-require "resteze/action"
 
 # Middlewares
 require "resteze/middleware/raise_error"
@@ -96,6 +100,29 @@ module Resteze
       @action_defaults.merge!(options)
       nil
     end
+
+    # Chooses how the API authenticates, without opening the module's
+    # Authenticator: `authenticate_with :api_key, header: "X-Api-Key",
+    # value: -> { MyApi.api_key }`. Call it once per scheme to combine
+    # them. Reopen MyApi::Authenticator only to override its lifecycle.
+    def authenticate_with(name, **)
+      component_class(:Authenticator).strategy(name, **)
+    end
+
+    # Chooses how the client paces itself, without opening the module's
+    # RateLimiter: `rate_limit_with :fixed_window, limit: 100, window: 60`.
+    # Reopen MyApi::RateLimiter to override `retry?` and the rest.
+    def rate_limit_with(name, **)
+      component_class(:RateLimiter).strategy(name, **)
+    end
+
+    private
+
+    def component_class(name)
+      raise ArgumentError, "call this on a module that includes Resteze, after the include" unless include?(Resteze)
+
+      const_get(name, false)
+    end
   end
 
   extend ClassMethods
@@ -113,19 +140,31 @@ module Resteze
       # replace it (nil restores the default). Whatever is assigned is told
       # which module it serves, so it raises this module's errors.
       def rate_limiter
-        @rate_limiter || @rate_limiter_mutex.synchronize { @rate_limiter ||= adopt_rate_limiter(self::RateLimiter.new) }
+        @rate_limiter || @component_mutex.synchronize { @rate_limiter ||= adopt(self::RateLimiter.new) }
       end
 
       def rate_limiter=(limiter)
-        @rate_limiter = adopt_rate_limiter(limiter)
+        @rate_limiter = adopt(limiter)
       end
 
-      def adopt_rate_limiter(limiter)
-        limiter.api_module = self if limiter.respond_to?(:api_module=)
-        limiter
+      # One Authenticator per API module, shared by every thread, with the
+      # same defaults and replacement rules as rate_limiter.
+      def authenticator
+        @authenticator || @component_mutex.synchronize { @authenticator ||= adopt(self::Authenticator.new) }
+      end
+
+      def authenticator=(authenticator)
+        @authenticator = adopt(authenticator)
+      end
+
+      # Tells a shared component which module it serves, so a replacement
+      # of any class raises this module's errors.
+      def adopt(component)
+        component.api_module = self if component.respond_to?(:api_module=)
+        component
       end
     end
-    @rate_limiter_mutex = Mutex.new
+    @component_mutex = Mutex.new
 
     configure do |config|
       config.api_base = "http://example.com/"
@@ -141,7 +180,8 @@ module Resteze
     const_set :Response,    Class.new(Resteze::Response)
     const_set :Result,      Class.new(Resteze::Result)
     const_set :Error,       Class.new(Resteze::Error)
-    const_set :RateLimiter, Class.new(Resteze::RateLimiter)
+    const_set :RateLimiter,   Class.new(Resteze::RateLimiter)
+    const_set :Authenticator, Class.new(Resteze::Authenticator)
     Resteze::Errors.define(self, self::Error)
 
     # Namespace other exceptions that we want to be able to catch and make sense of

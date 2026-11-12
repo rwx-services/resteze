@@ -1,7 +1,12 @@
+require "resteze/authenticating"
+require "resteze/instrumentation"
+require "resteze/rate_limiting"
+
 module Resteze
   class Client
     include Resteze::ApiModule
     prepend Resteze::Instrumentation
+    prepend Resteze::Authenticating
     prepend Resteze::RateLimiting
 
     def self.user_agent
@@ -31,12 +36,18 @@ module Resteze
       Thread.current["#{client_name}_default_client"] ||= new(default_connection)
     end
 
+    # The Authenticator's connection options (mutual TLS, say) are applied
+    # here; an override of this method must pass them to Faraday itself.
     def self.default_connection
-      Thread.current["#{client_name}_default_connection"] ||= Faraday.new do |conn|
+      Thread.current["#{client_name}_default_connection"] ||= Faraday.new(connection_options) do |conn|
         conn.use Faraday::Request::UrlEncoded
         conn.use api_module::Middleware::RaiseError
         conn.adapter Faraday.default_adapter
       end
+    end
+
+    def self.connection_options
+      api_module.try(:authenticator)&.connection_options || {}
     end
 
     def self.faraday_adapter
@@ -73,9 +84,11 @@ module Resteze
 
     # TODO: Look at refactoring this if possible to improve the Abc size
     # rubocop:disable-next Metrics/AbcSize
-    def execute_request(method, path, headers: {}, params: {})
+    # `query:` always goes in the query string, whatever the method, where
+    # `params:` becomes the body for anything but GET, HEAD and DELETE.
+    def execute_request(method, path, headers: {}, params: {}, query: {})
       params = util.objects_to_ids(params)
-      body, query_params = process_params(method, params)
+      body, query_params = process_params(method, params, query)
       headers = request_headers.merge(util.normalize_headers(headers))
       context = request_log_context(body:, method:, path:, query_params:, headers:)
 
@@ -106,7 +119,7 @@ module Resteze
 
     private
 
-    def process_params(method, params)
+    def process_params(method, params, query = {})
       body = nil
       query_params = nil
       case method.to_s.downcase.to_sym
@@ -115,6 +128,7 @@ module Resteze
       else
         body = params.to_json
       end
+      query_params = (query_params || {}).merge(query) if query.present?
       [body, query_params]
     end
 
