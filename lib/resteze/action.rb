@@ -3,14 +3,15 @@ module Resteze
   # type for one named operation such as :retrieve or :track.
   class Action
     OPTIONS   = %i[method on path id id_param returns as].freeze
-    RESERVED  = %i[retrieve list create update].freeze
+    RESERVED  = %i[retrieve list create update destroy].freeze
     ON_VALUES = %i[collection member].freeze
     ID_VALUES = %i[path param].freeze
     BUILT_IN = {
       retrieve: { method: :get, on: :member, path: nil, id: :path },
       list: { method: :get, on: :collection, path: nil },
       create: { method: :post, on: :collection, path: nil },
-      update: { method: :put, on: :member, path: nil, id: :path }
+      update: { method: :put, on: :member, path: nil, id: :path },
+      destroy: { method: :delete, on: :member, path: nil, id: :path }
     }.freeze
 
     attr_reader :name, :owner, :on, :path, :id, :returns, :as

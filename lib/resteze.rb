@@ -15,6 +15,7 @@ require "resteze/actions"
 require "resteze/api_resource"
 require "resteze/list"
 require "resteze/save"
+require "resteze/destroy"
 
 # API resource support classes
 require "resteze/object"
@@ -155,6 +156,11 @@ module Resteze
     const_set(:Save, Module.new).module_eval do
       extend ActiveSupport::Concern
       include Resteze::Save
+    end
+
+    const_set(:Destroy, Module.new).module_eval do
+      extend ActiveSupport::Concern
+      include Resteze::Destroy
     end
 
     const_set(:Util, Module.new).module_eval do
