@@ -26,6 +26,7 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - lib/resteze/client.rb
+    - lib/resteze/rate_limiter.rb
     - test/**/*
 
 Metrics/MethodLength:

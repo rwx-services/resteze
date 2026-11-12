@@ -107,12 +107,22 @@ module Resteze
                     :read_timeout,
                     :logger,
                     :proxy
-      attr_writer :rate_limiter
 
       # One RateLimiter per API module, shared by every thread. Defaults to
-      # an instance of the module's own RateLimiter class.
+      # an instance of the module's own RateLimiter class; assign another to
+      # replace it (nil restores the default). Whatever is assigned is told
+      # which module it serves, so it raises this module's errors.
       def rate_limiter
-        @rate_limiter || @rate_limiter_mutex.synchronize { @rate_limiter ||= self::RateLimiter.new }
+        @rate_limiter || @rate_limiter_mutex.synchronize { @rate_limiter ||= adopt_rate_limiter(self::RateLimiter.new) }
+      end
+
+      def rate_limiter=(limiter)
+        @rate_limiter = adopt_rate_limiter(limiter)
+      end
+
+      def adopt_rate_limiter(limiter)
+        limiter.api_module = self if limiter.respond_to?(:api_module=)
+        limiter
       end
     end
     @rate_limiter_mutex = Mutex.new

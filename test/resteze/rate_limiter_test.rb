@@ -59,14 +59,16 @@ module Resteze
     describe "state" do
       subject { Resteze::RateLimiter.new }
 
-      it "starts empty and returns snapshots" do
+      it "starts empty and returns deep snapshots" do
         assert_empty subject.state
 
-        subject.update_state(remaining: 5)
+        subject.update_state(remaining: 5, times: [1])
         snapshot = subject.state
         snapshot[:remaining] = 0
+        snapshot[:times] << 2
 
-        assert_equal 5, subject.state[:remaining]
+        assert_equal 5,   subject.state[:remaining]
+        assert_equal [1], subject.state[:times]
       end
 
       it "allows read-modify-write inside synchronize, re-entrantly" do
@@ -129,14 +131,48 @@ module Resteze
         assert_requested :get, URL, times: 3
       end
 
-      it "waits retry_after seconds between attempts" do
-        BodyApi.rate_limiter = Class.new(BodyApi::RateLimiter) { def retry_after(_error) = 0.01 }.new
-        stub_request(:get, URL).to_return(status: 429).then.to_return(body: SUCCESS)
+      it "waits retry_after seconds between attempts through the limiter's sleeper" do
+        sleeps = []
+        BodyApi.rate_limiter = BodyApi::RateLimiter.new(sleeper: ->(seconds) { sleeps << seconds })
+        stub_request(:get, URL).to_return(status: 429, headers: { "Retry-After" => "2" }).then.to_return(body: SUCCESS)
 
-        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         BodyApi::Client.new.execute_request(:get, "/users/1")
 
-        assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :>=, 0.01
+        assert_equal [2.0], sleeps
+      end
+
+      it "clamps a retry wait to max_wait" do
+        sleeps = []
+        BodyApi.rate_limiter = BodyApi::RateLimiter.new(max_wait: 3, sleeper: ->(seconds) { sleeps << seconds })
+        stub_request(:get, URL).to_return(status: 429, headers: { "Retry-After" => "9" * 400 }).then.to_return(body: SUCCESS)
+
+        BodyApi::Client.new.execute_request(:get, "/users/1")
+
+        assert_equal [3.0], sleeps
+      end
+
+      it "raises the 429 itself instead of sleeping before a retry under on_wait: :raise" do
+        sleeps = []
+        BodyApi.rate_limiter = BodyApi::RateLimiter.new(on_wait: :raise, sleeper: ->(seconds) { sleeps << seconds })
+        stub_request(:get, URL).to_return(status: 429, headers: { "Retry-After" => "7" })
+
+        error = assert_raises(BodyApi::RateLimitError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
+
+        assert_equal 429, error.http_status
+        assert_equal 7,   error.retry_after
+        assert_empty sleeps
+        assert_requested :get, URL, times: 1
+      end
+
+      it "raises the module's error even from a replacement limiter of another class" do
+        strategy = Resteze::RateLimiter::FixedWindow.new(limit: 1, window: 60)
+        BodyApi.rate_limiter = Resteze::RateLimiter.new(strategy:, on_wait: :raise)
+        stub_request(:get, URL).to_return(body: SUCCESS)
+
+        BodyApi::Client.new.execute_request(:get, "/users/1")
+
+        assert_raises(BodyApi::RateLimitError) { BodyApi::Client.new.execute_request(:get, "/users/1") }
+        assert_equal BodyApi, BodyApi.rate_limiter.api_module
       end
 
       it "never retries with the default no-op limiter" do

@@ -1,7 +1,8 @@
 module Resteze
-  # Optional helper for the common rate-limit shape: three integer headers
-  # for the quota, the remaining calls and the reset. Nothing in Resteze
-  # calls it; a module's Response.rate_limit_from hook may.
+  # The value RateLimiter#rate_limit returns: a quota, the calls remaining
+  # and the reset. Strategies build it in `describe`; `from_headers` reads
+  # the common three-header shape, which FixedWindow uses with
+  # `headers: true` and a custom strategy or limiter may use directly.
   class RateLimit
     DEFAULT_HEADERS = {
       limit: "X-RateLimit-Limit",

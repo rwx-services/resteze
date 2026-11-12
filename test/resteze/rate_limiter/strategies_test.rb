@@ -49,6 +49,17 @@ module Resteze
           assert_raises(ArgumentError) { FixedWindow.new(limit: 1, window: 60, reset: :soon) }
           assert_raises(ArgumentError) { TokenBucket.new(capacity: 10, refill_rate: -1) }
         end
+
+        it "coerces options so strings from the environment work or fail at configuration time" do
+          strategy = FixedWindow.new(limit: "2", window: "60")
+
+          assert_equal 2, strategy.limit
+          assert_in_delta 60.0, strategy.window
+          assert_in_delta 2.5, TokenBucket.new(capacity: "2.5", refill_rate: "1").capacity
+          assert_raises(ArgumentError) { FixedWindow.new(limit: "two", window: 60) }
+          assert_raises(ArgumentError) { SlidingWindow.new(limit: "1.5", window: 60) }
+          assert_raises(ArgumentError) { LeakyBucket.new(capacity: Float::INFINITY, leak_rate: 1) }
+        end
       end
 
       describe FixedWindow do
@@ -107,6 +118,61 @@ module Resteze
 
           assert_equal 0, limiter.throttle
         end
+
+        it "honours a reported remaining count even when the API never sends the limit" do
+          limiter, time = limiter_with(FixedWindow.new(window: 60, headers: true))
+          limiter.track(response_with("X-RateLimit-Remaining" => "0"))
+
+          assert_in_delta 60, limiter.throttle, 0.001
+          assert_equal [60.0], time.sleeps
+          assert_nil limiter.rate_limit(nil).limit
+        end
+
+        it "keeps the lower of the local and reported remaining within a window" do
+          limiter, = limiter_with(FixedWindow.new(limit: 10, window: 60, headers: true))
+          8.times { limiter.throttle }
+          limiter.track(response_with("X-RateLimit-Remaining" => "5")) # answered before 6 of ours were sent
+
+          assert_equal 2, limiter.rate_limit(nil).remaining
+
+          limiter.track(response_with("X-RateLimit-Remaining" => "1")) # another process spent some
+
+          assert_equal 1, limiter.rate_limit(nil).remaining
+        end
+
+        it "starts a fresh window when the API's reset is beyond the local window" do
+          limiter, time = limiter_with(FixedWindow.new(limit: 10, window: 60, headers: true))
+          3.times { limiter.throttle }
+          time.advance(50)
+          limiter.track(response_with("X-RateLimit-Remaining" => "9", "X-RateLimit-Reset" => (time.now + 50).to_i.to_s))
+
+          assert_equal 9, limiter.rate_limit(nil).remaining
+          assert_in_delta time.now + 50, limiter.rate_limit(nil).reset, 1
+        end
+
+        it "rolls the window before syncing so a late response cannot revive a spent window" do
+          limiter, time = limiter_with(FixedWindow.new(limit: 2, window: 60, headers: true))
+          2.times { limiter.throttle }
+          time.advance(61)
+          limiter.track(response_with("X-RateLimit-Remaining" => "0"))
+
+          assert_equal 0, limiter.rate_limit(nil).remaining # the new window's budget, then the report
+          time.advance(60)
+
+          assert_equal 2, limiter.rate_limit(nil).remaining
+        end
+
+        it "does not trust a non-finite or far-future reset" do
+          limiter, time = limiter_with(FixedWindow.new(limit: 1, window: 60, headers: true))
+          limiter.throttle
+          limiter.track(response_with("X-RateLimit-Remaining" => "0", "X-RateLimit-Reset" => "9" * 400))
+
+          assert_in_delta 60, limiter.throttle, 0.001
+
+          limiter.track(response_with("X-RateLimit-Remaining" => "0", "X-RateLimit-Reset" => (time.now + 86_400).to_i.to_s))
+
+          assert_in_delta 60, limiter.throttle, 0.001
+        end
       end
 
       describe SlidingWindow do
@@ -162,9 +228,36 @@ module Resteze
           klass = Class.new(Resteze::RateLimiter) { strategy :token_bucket, capacity: 5, refill_rate: 1 }
 
           assert_equal [TokenBucket, { capacity: 5, refill_rate: 1 }], klass.strategy
+          assert_equal klass.strategy, Class.new(klass).strategy
           assert_kind_of TokenBucket, klass.new.strategy
           assert_kind_of TokenBucket, Class.new(klass).new.strategy
           assert_equal 5, klass.new.strategy.capacity
+        end
+
+        it "rejects limiter options given without a strategy" do
+          assert_raises(ArgumentError) { Class.new(Resteze::RateLimiter) { strategy(on_wait: :raise) } }
+          assert_raises(ArgumentError) { Class.new(Resteze::RateLimiter) { strategy(max_wait: 5) } }
+        end
+
+        it "takes max_wait from the macro, the constructor or the default" do
+          klass = Class.new(Resteze::RateLimiter) { strategy :token_bucket, capacity: 1, refill_rate: 1, max_wait: 5 }
+
+          assert_in_delta 5.0, klass.max_wait
+          assert_in_delta 5.0, Class.new(klass).new.max_wait
+          assert_equal Resteze::RateLimiter::DEFAULT_MAX_WAIT, Resteze::RateLimiter.new.max_wait
+          assert_raises(ArgumentError) { Resteze::RateLimiter.new(max_wait: 0) }
+        end
+
+        it "clamps every wait to max_wait, including non-finite and absurd ones" do
+          sleeps  = []
+          limiter = Resteze::RateLimiter.new(max_wait: 10, sleeper: ->(seconds) { sleeps << seconds })
+
+          assert_in_delta 10.0, limiter.wait(Float::INFINITY)
+          assert_in_delta 10.0, limiter.wait(Float::NAN)
+          assert_in_delta 10.0, limiter.wait(10**400)
+          assert_in_delta 0.0,  limiter.wait(-5)
+          assert_in_delta 2.5,  limiter.wait(2.5)
+          assert_equal [10.0, 10.0, 10.0, 2.5], sleeps
         end
 
         it "accepts a custom Strategy class" do

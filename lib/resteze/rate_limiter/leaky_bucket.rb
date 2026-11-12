@@ -9,8 +9,8 @@ module Resteze
 
       def initialize(capacity:, leak_rate:)
         super()
-        @capacity  = Strategy.positive!(:capacity, capacity).to_f
-        @leak_rate = Strategy.positive!(:leak_rate, leak_rate).to_f
+        @capacity  = Strategy.number!(:capacity, capacity)
+        @leak_rate = Strategy.number!(:leak_rate, leak_rate)
       end
 
       def acquire(state, now)

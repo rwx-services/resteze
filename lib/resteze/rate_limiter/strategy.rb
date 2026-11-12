@@ -21,10 +21,22 @@ module Resteze
         class_name.constantize
       end
 
-      def self.positive!(name, value)
-        raise ArgumentError, "#{name} must be a positive number, got #{value.inspect}" unless value.to_f.positive?
+      # Coerces a count option to a positive Integer, so a String from the
+      # environment is caught at configuration time rather than on the first
+      # comparison.
+      def self.integer!(name, value)
+        positive!(name, Integer(value, exception: false), value)
+      end
 
-        value
+      # Coerces a rate, capacity or duration option to a positive Float.
+      def self.number!(name, value)
+        positive!(name, Float(value, exception: false), value)
+      end
+
+      def self.positive!(name, coerced, original = coerced)
+        return coerced if coerced&.positive? && (!coerced.is_a?(Float) || coerced.finite?)
+
+        raise ArgumentError, "#{name} must be a positive number, got #{original.inspect}"
       end
 
       # Admit one request now and return 0, or return the seconds until one

@@ -31,7 +31,7 @@ module Resteze
   #
   # The four common algorithms are built in and chosen with `strategy`:
   #
-  #   module Braze
+  #   module MyApi
   #     class RateLimiter
   #       strategy :fixed_window, limit: 250_000, window: 3600, headers: true
   #     end
@@ -42,47 +42,52 @@ module Resteze
   #   strategy :token_bucket,   capacity: 100, refill_rate: 10    # bursts, refilled per second
   #   strategy :leaky_bucket,   capacity: 100, leak_rate: 10      # smoothed, drained per second
   #
-  # `headers: true` on a fixed window syncs the local count and window with
+  # `headers: true` on a fixed window syncs the local budget and window with
   # the API's X-RateLimit-* headers (or `headers: { remaining: "...", ... }`
-  # for other names), which is how Braze and JD Power report theirs.
+  # for other names). Two further options apply to any strategy:
+  #
+  #   on_wait:  :sleep (default) waits in the calling thread; :raise raises
+  #             MyApi::RateLimitError with the wait in retry_after instead,
+  #             for callers such as background jobs that reschedule.
+  #   max_wait: the longest wait honoured, in seconds (default 3600). Any
+  #             longer, non-finite or absurd wait, such as one computed from
+  #             a bad header, is clamped to it.
+  #
+  # Every wait, whether from a strategy or before a retry, goes through
+  # `wait`, so both options and the injectable sleeper apply everywhere.
   #
   # State lives in a mutex-guarded hash so a subclass need not think about
-  # threads: read a snapshot with `state`, change it with `update_state`, or
-  # work on the live hash inside `synchronize` for read-modify-write
-  # sequences. Avoid instance variables. Waiting always happens outside the
-  # lock, so one thread's wait never blocks another thread's bookkeeping.
+  # threads: read a deep-copied snapshot with `state`, change it with
+  # `update_state`, or work on the live hash inside `synchronize` for
+  # read-modify-write sequences. Avoid instance variables. Waiting always
+  # happens outside the lock, so one thread's wait never blocks another
+  # thread's bookkeeping.
   class RateLimiter
     include Resteze::ApiModule
 
+    ON_WAIT          = %i[sleep raise].freeze
+    DEFAULT_MAX_WAIT = 3600
+
     class << self
       # Chooses the built-in strategy (by name) or a custom Strategy class
-      # that instances of this limiter use. Without arguments, returns the
-      # configured [class, options] pair or nil.
-      #
-      # `on_wait:` says what to do when the strategy cannot admit a request
-      # yet: `:sleep` (the default) waits in the calling thread; `:raise`
-      # raises MyApi::RateLimitError with the wait in `retry_after`, for
-      # callers such as background jobs that would rather reschedule.
-      def strategy(name = nil, on_wait: nil, **options)
-        return @strategy if name.nil?
+      # that instances of this limiter use, with `on_wait:` and `max_wait:`
+      # for the limiter itself and any other options for the strategy.
+      # Without arguments, returns the [class, options] pair in effect for
+      # this class, inherited from a superclass when it declares none.
+      def strategy(name = nil, **options)
+        return strategy_spec if name.nil? && options.empty?
+        raise ArgumentError, "strategy needs a name or class before its options" if name.nil?
 
-        klass = name.is_a?(Class) ? name : Strategy.lookup(name)
-        @strategy = [klass, options]
-        @on_wait  = ON_WAIT.include?(on_wait) ? on_wait : raise_on_wait(on_wait) if on_wait
+        configure(**options.extract!(:on_wait, :max_wait))
+        @strategy = [name.is_a?(Class) ? name : Strategy.lookup(name), options]
         nil
       end
 
-      # The configured on_wait, inherited from the superclass; :sleep by default.
-      def on_wait
-        @on_wait || (superclass.respond_to?(:on_wait) ? superclass.on_wait : :sleep)
+      def configure(on_wait: nil, max_wait: nil)
+        @on_wait  = validate_on_wait(on_wait) if on_wait
+        @max_wait = validate_max_wait(max_wait) if max_wait
       end
 
-      def raise_on_wait(value)
-        raise ArgumentError, "on_wait: must be one of #{ON_WAIT.map(&:inspect).join(', ')}, got #{value.inspect}"
-      end
-
-      # The configured [class, options] pair, inherited from the superclass
-      # when this class declares none.
       def strategy_spec
         @strategy || (superclass.respond_to?(:strategy_spec) ? superclass.strategy_spec : nil)
       end
@@ -91,19 +96,44 @@ module Resteze
         spec = strategy_spec
         spec && spec[0].new(**spec[1])
       end
+
+      def on_wait
+        @on_wait || (superclass.respond_to?(:on_wait) ? superclass.on_wait : :sleep)
+      end
+
+      def max_wait
+        @max_wait || (superclass.respond_to?(:max_wait) ? superclass.max_wait : DEFAULT_MAX_WAIT)
+      end
+
+      def validate_on_wait(value)
+        return value if ON_WAIT.include?(value)
+
+        raise ArgumentError, "on_wait: must be one of #{ON_WAIT.map(&:inspect).join(', ')}, got #{value.inspect}"
+      end
+
+      def validate_max_wait(value)
+        Strategy.number!(:max_wait, value)
+      end
     end
 
-    ON_WAIT = %i[sleep raise].freeze
+    attr_reader :strategy, :on_wait, :max_wait
+    attr_writer :api_module
 
-    attr_reader :strategy, :on_wait
-
-    def initialize(strategy: self.class.strategy_instance, on_wait: self.class.on_wait, clock: nil, sleeper: nil)
+    def initialize(strategy: self.class.strategy_instance, on_wait: self.class.on_wait,
+                   max_wait: self.class.max_wait, clock: nil, sleeper: nil)
       @mutex    = Mutex.new
       @state    = {}
       @strategy = strategy
-      @on_wait  = ON_WAIT.include?(on_wait) ? on_wait : self.class.raise_on_wait(on_wait)
+      @on_wait  = self.class.validate_on_wait(on_wait)
+      @max_wait = self.class.validate_max_wait(max_wait)
       @clock    = clock   || -> { Time.now.to_f }
       @sleeper  = sleeper || ->(seconds) { sleep(seconds) }
+    end
+
+    # The module this limiter serves. Set by MyApi.rate_limiter= so that a
+    # replacement limiter of any class still raises MyApi's errors.
+    def api_module
+      @api_module || self.class.api_module
     end
 
     # Receives (method, path, params:, headers:); the default needs none.
@@ -136,27 +166,29 @@ module Resteze
     def throttle
       waited = 0.0
       loop do
-        wait = synchronize { |state| strategy.acquire(state, now) }
-        break if wait <= 0
+        seconds = synchronize { |state| strategy.acquire(state, now) }
+        break if seconds <= 0
 
-        raise_for_wait(wait) if on_wait == :raise
-
-        @sleeper.call(wait)
-        waited += wait
+        waited += wait(seconds)
       end
       waited
     end
 
-    # Raised instead of waiting under on_wait: :raise. The error carries the
-    # wait in retry_after and, like any refusal from before_request, has no
-    # HTTP status because nothing was sent.
-    def raise_for_wait(wait)
-      raise api_module::RateLimitError.new("rate limit reached; retry in #{wait.ceil} seconds", retry_after: wait.ceil)
+    # Honours on_wait and max_wait for a wait of `seconds`: sleeps through
+    # the injectable sleeper and returns the seconds slept, or raises
+    # `error` (default: a fresh MyApi::RateLimitError carrying the wait in
+    # retry_after) under on_wait: :raise.
+    def wait(seconds, error: nil)
+      seconds = clamp(seconds)
+      raise(error || wait_error(seconds)) if on_wait == :raise
+
+      @sleeper.call(seconds) if seconds.positive?
+      seconds
     end
 
-    # A snapshot of the limiter's state.
+    # A deep-copied snapshot of the limiter's state.
     def state
-      synchronize(&:dup)
+      synchronize(&:deep_dup)
     end
 
     def update_state(**values)
@@ -175,6 +207,17 @@ module Resteze
 
     def now
       @clock.call
+    end
+
+    def clamp(seconds)
+      seconds = seconds.to_f
+      return max_wait.to_f unless seconds.finite?
+
+      seconds.clamp(0.0, max_wait.to_f)
+    end
+
+    def wait_error(seconds)
+      api_module::RateLimitError.new("rate limit reached; retry in #{seconds.ceil} seconds", retry_after: seconds.ceil)
     end
   end
 end

@@ -8,8 +8,8 @@ module Resteze
 
       def initialize(capacity:, refill_rate:)
         super()
-        @capacity    = Strategy.positive!(:capacity, capacity).to_f
-        @refill_rate = Strategy.positive!(:refill_rate, refill_rate).to_f
+        @capacity    = Strategy.number!(:capacity, capacity)
+        @refill_rate = Strategy.number!(:refill_rate, refill_rate)
       end
 
       def acquire(state, now)

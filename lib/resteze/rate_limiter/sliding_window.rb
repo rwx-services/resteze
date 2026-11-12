@@ -8,8 +8,8 @@ module Resteze
 
       def initialize(limit:, window:)
         super()
-        @limit  = Strategy.positive!(:limit, limit)
-        @window = Strategy.positive!(:window, window).to_f
+        @limit  = Strategy.integer!(:limit, limit)
+        @window = Strategy.number!(:window, window)
       end
 
       def acquire(state, now)

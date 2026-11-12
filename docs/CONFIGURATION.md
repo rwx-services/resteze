@@ -566,7 +566,7 @@ end
 
 | Strategy | Options | Behaviour |
 |---|---|---|
-| `:fixed_window` | `limit:`, `window:` seconds, `headers:`, `reset:` | At most `limit` requests per window, windows aligned to the first request. With `headers: true` the count and window follow the API's `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers, which is how Braze and JD Power report theirs; pass a Hash to name other headers, and `reset: :seconds` when the reset header is a countdown rather than a time. `limit:` may be omitted when the API sends it |
+| `:fixed_window` | `limit:`, `window:` seconds, `headers:`, `reset:` | At most `limit` requests per window, windows aligned to the first request. With `headers: true` the budget and window follow the API's `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers, which is how Braze and JD Power report theirs; pass a Hash to name other headers, and `reset: :seconds` when the reset header is a countdown rather than a time. `limit:` may be omitted when the API sends it, or sends only the remaining count. Syncing is conservative: within a window the lower of the local and reported remaining counts wins, since requests admitted after the server answered are not in its number yet; a reset beyond the local window starts a fresh one; non-finite or far-future resets are not trusted |
 | `:sliding_window` | `limit:`, `window:` seconds | At most `limit` requests in any trailing window. Exact; memory bounded by `limit` |
 | `:token_bucket` | `capacity:`, `refill_rate:` per second | Bursts up to `capacity`, then paced at the refill rate |
 | `:leaky_bucket` | `capacity:`, `leak_rate:` per second | Smooths bursts into a steady rate; a full bucket waits for room |
@@ -669,7 +669,13 @@ class TrackEventsJob
 end
 ```
 
-The same option is accepted by the constructor, `MyApi::RateLimiter.new(on_wait: :raise)`, and `RateLimitError.new(message, retry_after: seconds)` builds such an error by hand.
+The same option is accepted by the constructor, `MyApi::RateLimiter.new(on_wait: :raise)`, and `RateLimitError.new(message, retry_after: seconds)` builds such an error by hand. Under `on_wait: :raise` a retry decided by `retry?` is not slept either: the 429 itself is raised, with its `retry_after`, so both cases reach the job the same way.
+
+Every wait, whether from a strategy or before a retry, is clamped to `max_wait` seconds, one hour by default. A `Retry-After` or reset header that is absurd, non-finite or malicious therefore costs at most one `max_wait`, never a thread parked for a year or a crash on `sleep(Infinity)`. Set it alongside `on_wait:` in `strategy`, or in the constructor:
+
+```ruby
+strategy :fixed_window, limit: 1000, window: 60, max_wait: 120
+```
 
 ### Overriding the lifecycle
 
