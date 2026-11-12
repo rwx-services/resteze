@@ -120,11 +120,7 @@ module Resteze
     const_set :Response,    Class.new(Resteze::Response)
     const_set :Result,      Class.new(Resteze::Result)
     const_set :Error,       Class.new(Resteze::Error)
-
-    Resteze::Error.subclasses.select { |klass| klass.name.start_with?("Resteze::") }.each do |error_class|
-      error_type = error_class.to_s.demodulize
-      const_set error_type, Class.new(error_class) unless const_defined?("#{self}::#{error_type}")
-    end
+    Resteze::Errors.define(self, self::Error)
 
     # Namespace other exceptions that we want to be able to catch and make sense of
     # without needing lower level implementation details

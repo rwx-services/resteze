@@ -11,26 +11,33 @@
 
 ## Error Hierarchy
 
-Resteze provides a comprehensive error hierarchy that gets dynamically created for each API module:
+Resteze creates a full error hierarchy inside each API module. Every class below is a subclass of that module's own `Error`, so `rescue YourApi::Error` catches everything the client raises, and an error from one API is never caught by a rescue clause written for another.
 
 ```
 StandardError
-└── YourApi::Error (base for all API errors)
-    ├── YourApi::ApiError (server-side errors)
-    ├── YourApi::ApiConnectionError (network/connection errors)
-    └── YourApi::InvalidRequestError (client-side errors)
+└── Resteze::Error
+    └── YourApi::Error (base for all of this API's errors)
+        ├── YourApi::ApiError            (5xx, and 4xx with no more specific class)
+        ├── YourApi::ApiConnectionError  (connection refused, timeout, SSL)
+        ├── YourApi::AuthenticationError (401, 403)
+        ├── YourApi::InvalidRequestError (400, and requests the client cannot build)
+        └── YourApi::RateLimitError      (429, with #retry_after)
 
-Additional wrapped errors:
-├── YourApi::NotImplementedError
-├── YourApi::ResourceNotFound (404)
-├── YourApi::UnprocessableEntityError (422)
-└── YourApi::ConflictError (409)
+Faraday-derived errors kept for compatibility (not subclasses of YourApi::Error):
+├── YourApi::ResourceNotFound          < Faraday::ResourceNotFound (404)
+├── YourApi::UnprocessableEntityError  < Faraday::UnprocessableEntityError (422)
+└── YourApi::ConflictError             < Faraday::ConflictError (409)
+
+Also namespaced:
+└── YourApi::NotImplementedError
 ```
+
+The `RaiseError` middleware maps every Faraday error onto this hierarchy. The original Faraday error is available as `e.cause`.
 
 ## Built-in Error Types
 
 ### ApiError
-Server-side errors (5xx status codes):
+Server-side errors (5xx), plus any 4xx that has no more specific class (for example 405 or 410):
 
 ```ruby
 begin
@@ -38,7 +45,8 @@ begin
 rescue MyApi::ApiError => e
   puts "Server error: #{e.message}"
   puts "HTTP Status: #{e.http_status}"
-  puts "Response body: #{e.response.body}"
+  puts "Response body: #{e.http_body}"
+  puts "Parsed body: #{e.json_body.inspect}"   # nil unless the body parsed as JSON or XML
   
   # Retry logic for server errors
   retry if e.http_status >= 500
@@ -67,7 +75,7 @@ end
 ```
 
 ### InvalidRequestError
-Client-side errors (4xx status codes):
+A `400 Bad Request`, or a request the client could not build (for example `refresh` on an object with no id):
 
 ```ruby
 begin
@@ -75,10 +83,33 @@ begin
 rescue MyApi::InvalidRequestError => e
   puts "Invalid request: #{e.message}"
   puts "Invalid parameter: #{e.param}" if e.param
-  puts "HTTP Status: #{e.http_status}"
+  puts "HTTP Status: #{e.http_status}"   # nil when the request was never sent
   
   # Don't retry - fix the request
   log_validation_error(e)
+end
+```
+
+### AuthenticationError
+`401 Unauthorized` and `403 Forbidden`:
+
+```ruby
+begin
+  user = MyApi::User.retrieve('123')
+rescue MyApi::AuthenticationError => e
+  puts "Check the API key: #{e.message}"
+end
+```
+
+### RateLimitError
+`429 Too Many Requests`. `retry_after` reads the `Retry-After` header as seconds, accepting either delay-seconds or an HTTP-date, and is `nil` when the header is absent:
+
+```ruby
+begin
+  MyApi::Event.track(events: batch)
+rescue MyApi::RateLimitError => e
+  sleep(e.retry_after || 1)
+  retry
 end
 ```
 
@@ -105,7 +136,7 @@ rescue MyApi::UnprocessableEntityError => e
   puts "Validation failed: #{e.message}"
   
   # Parse validation errors from response
-  errors = JSON.parse(e.response.body)['errors']
+  errors = JSON.parse(e.response[:body])['errors']
   errors.each do |field, messages|
     puts "#{field}: #{messages.join(', ')}"
   end
@@ -127,26 +158,30 @@ end
 
 ## Error Attributes
 
-All error classes include these attributes:
+Every subclass of `MyApi::Error` carries the HTTP response that produced it:
 
 ```ruby
 begin
   MyApi::User.retrieve('123')
 rescue MyApi::Error => e
-  # Basic attributes
   e.message       # Error message
-  e.http_status   # HTTP status code (e.g., 404, 500)
-  e.response      # Faraday response object
-  
-  # Response details
-  e.response.body    # Raw response body
-  e.response.headers # Response headers
-  e.response.status  # Status code
-  
+  e.http_status   # HTTP status code (e.g., 401, 500); nil for connection failures
+  e.http_body     # Raw response body
+  e.http_headers  # Response headers
+  e.header("Retry-After")  # Case-insensitive header lookup
+  e.json_body     # Body parsed as JSON or XML, or nil
+  e.response      # Faraday's response hash: { status:, headers:, body:, request: }
+  e.cause         # The original Faraday error
+
   # For InvalidRequestError
-  e.param         # The parameter that caused the error
+  e.param         # The parameter that caused the error, when known
+
+  # For RateLimitError
+  e.retry_after   # Seconds to wait, from Retry-After, or nil
 end
 ```
+
+The Faraday-derived `ResourceNotFound`, `UnprocessableEntityError` and `ConflictError` expose the same response through Faraday's own readers: `e.response`, `e.response_status`, `e.response_headers` and `e.response_body`.
 
 ## Handling Errors
 

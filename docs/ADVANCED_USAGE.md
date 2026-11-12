@@ -249,36 +249,31 @@ end
 
 ### Custom Error Handling
 
+`RaiseError` already maps 401/403 to `MyApi::AuthenticationError` and 429 to `MyApi::RateLimitError`. To add a class for a status the built-in hierarchy does not single out, subclass the nearest built-in error and raise it from a middleware placed before `RaiseError`:
+
 ```ruby
 module MyApi
-  # Define custom errors
-  class RateLimitError < Error; end
-  class AuthenticationError < Error; end
+  # 503 during a maintenance window is worth telling apart from other 5xx
+  class MaintenanceError < ApiError; end
   
-  # Custom middleware for error handling
-  class Middleware::CustomErrorHandler < Faraday::Middleware
+  class Middleware::MaintenanceCheck < Faraday::Middleware
     def on_complete(env)
-      case env[:status]
-      when 429
-        raise RateLimitError.new(
-          "Rate limit exceeded. Retry after #{env[:response_headers]['retry-after']}",
-          http_status: 429,
-          response: env
-        )
-      when 401
-        raise AuthenticationError.new(
-          "Authentication failed",
-          http_status: 401,
-          response: env
-        )
-      end
+      return unless env[:status] == 503 && env[:response_headers]["X-Maintenance"]
+
+      raise MaintenanceError.new(
+        "API is down for maintenance",
+        http_status: 503,
+        http_body: env[:body],
+        http_headers: env[:response_headers]
+      )
     end
   end
   
   class Client < Resteze::Client
     def self.default_connection
-      @default_connection ||= Faraday.new do |conn|
-        conn.use Middleware::CustomErrorHandler
+      Thread.current["#{client_name}_default_connection"] ||= Faraday.new do |conn|
+        conn.use Faraday::Request::UrlEncoded
+        conn.use Middleware::MaintenanceCheck
         conn.use Middleware::RaiseError
         conn.adapter Faraday.default_adapter
       end
