@@ -3,9 +3,9 @@ module Resteze
     # An API key sent in a header (default X-Api-Key) or, with `query:`, as
     # a query-string parameter on every request regardless of HTTP method.
     #
-    #   strategy :api_key, value: -> { ENV.fetch("MY_API_KEY") }
-    #   strategy :api_key, header: "Authorization", value: -> { "Token #{token}" }
-    #   strategy :api_key, query: "api_key", value: ...
+    #   strategy :api_key, header: "X-Api-Key", value: -> { MyApi.api_key }
+    #   strategy :api_key, header: "Authorization", value: -> { "Token #{MyApi.api_key}" }
+    #   strategy :api_key, query: "api_key", value: -> { MyApi.api_key }
     class ApiKey < Strategy
       attr_reader :header, :query
 
@@ -19,7 +19,7 @@ module Resteze
       end
 
       def apply(request, _state)
-        key = resolve(@value).to_s
+        key = resolve!(:value, @value).to_s
         if query
           request.query[query] = key
         else

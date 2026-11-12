@@ -5,7 +5,7 @@ module Resteze
     # A token obtained elsewhere (an OAuth flow the application ran, say)
     # fits here through a callable.
     #
-    #   strategy :bearer, token: -> { ENV.fetch("MY_API_TOKEN") }
+    #   strategy :bearer, token: -> { MyApi.api_key }
     #   strategy :bearer, token: -> { TokenStore.current }, scheme: "Token"
     class Bearer < Strategy
       attr_reader :scheme
@@ -17,7 +17,7 @@ module Resteze
       end
 
       def apply(request, _state)
-        request.headers["Authorization"] = "#{scheme} #{resolve(@token)}"
+        request.headers["Authorization"] = "#{scheme} #{resolve!(:token, @token)}"
       end
     end
   end

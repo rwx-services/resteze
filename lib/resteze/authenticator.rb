@@ -19,20 +19,28 @@ module Resteze
   #     renewed; `attempt` counts failures so far, starting at 1.
   #
   # The built-in schemes are chosen with `strategy`, and several may be
-  # combined, for example mutual TLS with an API key. Every secret-bearing
-  # option takes a value or a callable, so credentials can be read lazily
-  # and rotated without reconfiguring:
+  # combined, for example mutual TLS with an API key. The credential is
+  # usually a callable reading a module setting that an initializer filled
+  # through `configure`, so it is read on every request:
   #
   #   module MyApi
+  #     include Resteze
+  #
+  #     class << self
+  #       attr_accessor :api_key
+  #     end
+  #
   #     class Authenticator
-  #       strategy :api_key, header: "X-Api-Key", value: -> { ENV.fetch("MY_API_KEY") }
+  #       strategy :api_key, header: "X-Api-Key", value: -> { MyApi.api_key }
   #     end
   #   end
+  #
+  #   MyApi.configure { |config| config.api_key = ENV["MY_API_KEY"] }
   #
   #   strategy :api_key, header: "X-Api-Key", value: ...     # or query: "api_key"
   #   strategy :basic,   username: ..., password: ...
   #   strategy :bearer,  token: ...                          # scheme: "Token" for other prefixes
-  #   strategy :mtls,    cert: "client.pem", key: "client-key.pem", ca: "ca.pem"
+  #   strategy :mtls,    cert: ..., key: ..., ca_file: ...   # PEM strings or paths
   #
   # Each built-in is a subclass of Resteze::Authenticator::Strategy, and a
   # custom scheme is the same: subclass it, implement `apply`, and pass the

@@ -85,15 +85,24 @@ end
 
 ## Authentication
 
-Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `strategy` names a built-in and hands it the credential; every credential option takes a value or a callable, and a callable is called on each request so a rotated key takes effect without a restart:
+Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `strategy` names a built-in and hands it the credential. The credential is normally a callable that reads a module setting, which an initializer fills through `configure`; the callable runs on each request, so a rotated key takes effect without a restart, and a setting that is still `nil` when a request goes out raises an `ArgumentError` naming the option rather than sending an empty credential:
 
 ```ruby
 module MyApi
   include Resteze
 
-  class Authenticator
-    strategy :api_key, header: 'X-Api-Key', value: -> { ENV.fetch('MY_API_KEY') }
+  class << self
+    attr_accessor :api_key
   end
+
+  class Authenticator
+    strategy :api_key, header: 'X-Api-Key', value: -> { MyApi.api_key }
+  end
+end
+
+# config/initializers/my_api.rb
+MyApi.configure do |config|
+  config.api_key = ENV['MY_API_KEY']
 end
 ```
 
@@ -144,7 +153,7 @@ module MyApi
 
   class Authenticator
     strategy SessionToken, login_url: 'https://api.example.com/login',
-                           username: -> { ENV.fetch('API_USER') }, password: -> { ENV.fetch('API_PASS') }
+                           username: -> { MyApi.username }, password: -> { MyApi.password }
   end
 end
 ```

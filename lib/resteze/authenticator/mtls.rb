@@ -11,8 +11,8 @@ module Resteze
     # pass `connection_options` to Faraday itself.
     #
     #   strategy :mtls, cert: "config/client.pem", key: "config/client-key.pem"
-    #   strategy :mtls, cert: -> { ENV.fetch("CLIENT_CERT") }, key: -> { ENV.fetch("CLIENT_KEY") },
-    #                   passphrase: -> { ENV["CLIENT_KEY_PASSPHRASE"] }, ca_file: "config/ca.pem"
+    #   strategy :mtls, cert: -> { MyApi.client_cert }, key: -> { MyApi.client_key },
+    #                   passphrase: -> { MyApi.client_key_passphrase }, ca_file: "config/ca.pem"
     class Mtls < Strategy
       def initialize(cert:, key:, ca_file: nil, passphrase: nil, verify: true)
         super()
@@ -28,11 +28,11 @@ module Resteze
       end
 
       def certificate
-        OpenSSL::X509::Certificate.new(pem(resolve(@cert)))
+        OpenSSL::X509::Certificate.new(pem(resolve!(:cert, @cert)))
       end
 
       def private_key
-        OpenSSL::PKey.read(pem(resolve(@key)), resolve(@passphrase))
+        OpenSSL::PKey.read(pem(resolve!(:key, @key)), resolve(@passphrase))
       end
 
       private

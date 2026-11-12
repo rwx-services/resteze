@@ -174,8 +174,12 @@ end
 module AuthApi
   include Resteze
 
+  class << self
+    attr_accessor :api_key
+  end
+
   class Authenticator
-    strategy :api_key, header: "X-Api-Key", value: -> { "secret-key" }
+    strategy :api_key, header: "X-Api-Key", value: -> { AuthApi.api_key }
   end
 
   class Widget < ApiResource
@@ -188,7 +192,8 @@ end
 
 AuthApi.configure do |config|
   config.api_base = "http://auth.example.com/"
-  config.logger = Logger.new(nil)
+  config.api_key  = "secret-key"
+  config.logger   = Logger.new(nil)
 end
 
 def configure_gem!

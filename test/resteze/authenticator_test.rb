@@ -84,6 +84,36 @@ module Resteze
       end
     end
 
+    describe "credentials from module settings" do
+      it "reads the setting on every request, so a rotated credential takes effect" do
+        AuthApi.api_key = "rotated"
+        stub_request(:get, URL).to_return(body: "{}")
+
+        AuthApi::Client.new.execute_request(:get, "/widgets/1")
+
+        assert_requested(:get, URL, headers: { "X-Api-Key" => "rotated" })
+      ensure
+        AuthApi.api_key = "secret-key"
+      end
+
+      it "fails clearly when the setting is not configured" do
+        AuthApi.api_key = nil
+
+        error = assert_raises(ArgumentError) { AuthApi::Widget.retrieve(1) }
+
+        assert_match(/value: for the api_key authentication strategy resolved to nil/, error.message)
+      ensure
+        AuthApi.api_key = "secret-key"
+      end
+
+      it "accepts a literal as well as a callable" do
+        req = request
+        Authenticator::Bearer.new(token: "literal").apply(req, {})
+
+        assert_equal "Bearer literal", req.headers["Authorization"]
+      end
+    end
+
     describe "the request lifecycle" do
       it "adds the module's credential to every request" do
         stub_request(:get, URL).with(headers: { "X-Api-Key" => "secret-key" }).to_return(body: '{"id":1}')

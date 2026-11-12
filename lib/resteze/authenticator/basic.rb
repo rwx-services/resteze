@@ -3,7 +3,7 @@ module Resteze
     # HTTP Basic: an Authorization header carrying the base64 of
     # "username:password".
     #
-    #   strategy :basic, username: -> { ENV.fetch("API_USER") }, password: -> { ENV.fetch("API_PASS") }
+    #   strategy :basic, username: -> { MyApi.username }, password: -> { MyApi.password }
     class Basic < Strategy
       def initialize(username:, password:)
         super()
@@ -12,7 +12,7 @@ module Resteze
       end
 
       def apply(request, _state)
-        credentials = "#{resolve(@username)}:#{resolve(@password)}"
+        credentials = "#{resolve!(:username, @username)}:#{resolve!(:password, @password)}"
         request.headers["Authorization"] = "Basic #{[credentials].pack('m0')}"
       end
     end
