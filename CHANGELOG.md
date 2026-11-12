@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - `Response#success?`, true for any 2xx status. `Response#ok?` is unchanged and means exactly 200, so a `201 Created` answers `success?` but not `ok?`.
 - `MyApi::RateLimitError`, raised for a 429, with `#retry_after` read from the `Retry-After` header (delay-seconds or HTTP-date).
 - `Error.from_faraday` builds a namespaced error from a Faraday error, keeping its status, headers, body, parsed `json_body` and response; `Error#header` looks a header up case-insensitively.
+- `Response.body_error` hook for APIs that report failures inside a 2xx body. Override it on `MyApi::Response` to return an error to raise; `Error.from_response` builds one from the parsed response.
 
 ### Changed
 

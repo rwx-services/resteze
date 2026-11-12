@@ -9,6 +9,17 @@ module Resteze
       build(message, response_attributes(error)).tap { |e| e.response = error.response }
     end
 
+    # Builds an error from a Resteze::Response, for APIs that report failures
+    # inside a successful HTTP response (see Response.body_error).
+    def self.from_response(response, message = nil)
+      data = response.data
+      attributes = { http_status: response.http_status, http_body: response.http_body,
+                     http_headers: response.http_headers || {},
+                     json_body: (data if data.is_a?(Hash) || data.is_a?(Array)) }
+
+      build(message, attributes).tap { |e| e.response = response }
+    end
+
     # Types with a different constructor signature override this.
     def self.build(message, attributes)
       new(message, **attributes)
