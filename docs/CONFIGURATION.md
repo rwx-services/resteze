@@ -91,7 +91,7 @@ Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator
 module MyApi
   include Resteze
 
-  authenticate_with SomeScheme, header: 'X-Api-Key'   # expects whatever SomeScheme's DEFAULTS name, e.g. MyApi.api_key
+  authenticate_with :api_key, header: 'X-Api-Key'   # expects MyApi.api_key
 end
 
 # config/initializers/my_api.rb
@@ -101,6 +101,12 @@ end
 ```
 
 The convention is a default. Any credential option also takes a Symbol naming a different setting (`value: :partner_key`), a callable (`value: -> { TokenStore.current }`), or a literal. Schemes combine; call `authenticate_with` once per scheme. (`strategy` inside `class Authenticator` is the same thing, for when you are reopening the class anyway to override its lifecycle.)
+
+### Built-in schemes
+
+| Scheme | Expects | Options | Sends |
+|---|---|---|---|
+| `:api_key` | `api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
 
 ### The lifecycle
 

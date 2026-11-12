@@ -160,3 +160,4 @@ module Resteze
 end
 
 require "resteze/authenticator/strategy"
+require "resteze/authenticator/api_key"
