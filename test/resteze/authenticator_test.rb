@@ -141,11 +141,13 @@ module Resteze
       end
 
       it "accepts a callable or a literal in place of a setting name" do
-        req = AuthApi::Authenticator.new(strategies: [HeaderKey.new(value: -> { "called" }),
-                                                      HeaderKey.new(header: "X-Lit", value: "literal")]).apply(request)
+        authenticator = AuthApi::Authenticator.new(strategies: [HeaderKey.new(value: -> { "called" }),
+                                                                HeaderKey.new(header: "X-Lit", value: "literal")])
+        req = authenticator.apply(request)
 
         assert_equal "called",  req.headers["X-Api-Key"]
         assert_equal "literal", req.headers["X-Lit"]
+        assert_empty authenticator.settings
 
         error = assert_raises(ArgumentError) { HeaderKey.new(value: -> {}).apply(request, {}) }
 
@@ -159,6 +161,14 @@ module Resteze
         AuthApi::Client.new.execute_request(:get, "/widgets/1")
 
         assert_requested(:get, URL, headers: { "X-Replaced" => "secret-key" })
+        assert_equal %i[api_key], AuthApi.authenticator.settings
+        assert_empty AuthApi.authenticator.missing_settings
+      end
+
+      it "says so when a bare strategy has no module to read from" do
+        error = assert_raises(ArgumentError) { HeaderKey.new.apply(request, {}) }
+
+        assert_match(/the API module\.api_key is not set/, error.message)
       end
     end
 

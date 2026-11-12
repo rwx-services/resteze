@@ -44,6 +44,18 @@ module Resteze
         value
       end
 
+      # The module settings this instance reads: DEFAULTS as overridden by
+      # the credential options it was built with.
+      def settings
+        self.class.settings(credential_options)
+      end
+
+      # The credential options as given to the constructor, so `settings`
+      # reflects a renamed setting; schemes implement it.
+      def credential_options
+        {}
+      end
+
       # Faraday connection options this scheme needs, merged into the
       # connection when it is built. Most schemes need none.
       def connection_options
@@ -78,7 +90,7 @@ module Resteze
         resolved = resolve(value)
         return resolved unless resolved.nil?
 
-        where = value.is_a?(Symbol) ? "#{api_module}.#{value} is not set" : "#{option}: resolved to nil"
+        where = value.is_a?(Symbol) ? "#{api_module || 'the API module'}.#{value} is not set" : "#{option}: resolved to nil"
         raise ArgumentError, "#{where}; the #{self.class.name.demodulize.underscore} authentication strategy needs it"
       end
     end

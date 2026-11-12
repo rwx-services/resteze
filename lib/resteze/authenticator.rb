@@ -123,12 +123,16 @@ module Resteze
       strategies.each { |strategy| strategy.api_module = mod if strategy.respond_to?(:api_module=) }
     end
 
-    # The settings the configured strategies expect on the module that are
-    # still nil, for checking configuration at boot:
+    # The module settings this instance's strategies read.
+    def settings
+      strategies.flat_map(&:settings).uniq
+    end
+
+    # Those settings that are still nil, for checking configuration at boot:
     #
     #   raise "MyApi needs #{MyApi.authenticator.missing_settings.join(', ')}" if MyApi.authenticator.missing_settings.any?
     def missing_settings
-      self.class.settings.select { |name| api_module.respond_to?(name) && api_module.public_send(name).nil? }
+      settings.reject { |name| api_module.respond_to?(name) && !api_module.public_send(name).nil? }
     end
 
     # Faraday connection options merged from every strategy, such as `ssl:`.

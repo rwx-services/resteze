@@ -183,6 +183,10 @@ class HeaderKey < Resteze::Authenticator::Strategy
     @header = header
   end
 
+  def credential_options
+    { value: @value }
+  end
+
   def apply(request, _state)
     request.headers[header] = resolve!(:value, @value).to_s
   end
