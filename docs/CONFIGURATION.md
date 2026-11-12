@@ -109,6 +109,9 @@ The convention is a default. Any credential option also takes a Symbol naming a 
 | `:api_key` | `api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
 | `:basic` | `username`, `password` | `username:`, `password:` | `Authorization: Basic …` |
 | `:bearer` | `api_key` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
+| `:mtls` | `client_cert`, `client_key`, `client_key_passphrase` | `cert:`, `key:`, `passphrase:`, `ca_file:`, `verify:` | a client certificate on the TLS connection; nothing on the requests |
+
+`cert:` and `key:` for `:mtls` are PEM strings or paths to PEM files, from the settings, a callable, or a literal. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
 
 ### The lifecycle
 

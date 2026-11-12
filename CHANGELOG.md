@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - `:api_key` authentication scheme: the module's `api_key` in a header (default `X-Api-Key`) or, with `query:`, in the query string on every request.
 - `:basic` authentication scheme: HTTP Basic from the module's `username` and `password`.
 - `:bearer` authentication scheme: `Authorization: Bearer <api_key>`, with `scheme:` for another prefix and `token:` for another setting or a callable.
+- `:mtls` authentication scheme: a client certificate on the TLS connection from the module's `client_cert` and `client_key` (PEM or path), with `client_key_passphrase`, `ca_file:` and `verify:`.
 - `Response#success?`, true for any 2xx status. `Response#ok?` is unchanged and means exactly 200, so a `201 Created` answers `success?` but not `ok?`.
 - `MyApi::RateLimitError`, raised for a 429, with `#retry_after` read from the `Retry-After` header (delay-seconds or HTTP-date).
 - `Error.from_faraday` builds a namespaced error from a Faraday error, keeping its status, headers, body, parsed `json_body` and response; `Error#header` looks a header up case-insensitively.
