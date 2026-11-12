@@ -206,6 +206,13 @@ module Resteze
         assert_nil rate_limit_error({}).retry_after
         assert_nil rate_limit_error("Retry-After" => "soon").retry_after
       end
+
+      it "prefers a retry_after given at construction over the header" do
+        error = Resteze::RateLimitError.new("wait", retry_after: 7, http_headers: { "Retry-After" => "30" })
+
+        assert_equal 7, error.retry_after
+        assert_equal 30, Resteze::RateLimitError.new("wait", http_headers: { "Retry-After" => "30" }).retry_after
+      end
     end
   end
 end

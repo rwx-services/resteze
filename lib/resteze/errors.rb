@@ -72,9 +72,10 @@ module Resteze
       RateLimit.header_value(http_headers, name)
     end
 
-    # Rate-limit state from the error's headers (see Response#rate_limit).
+    # Whatever the module's RateLimiter makes of this error (see
+    # Resteze::RateLimiter#rate_limit), or nil.
     def rate_limit
-      @rate_limit ||= RateLimit.from_headers(http_headers, api_module.try(:rate_limit_headers))
+      @rate_limit ||= api_module.try(:rate_limiter)&.rate_limit(self)
     end
   end
 
@@ -101,9 +102,24 @@ module Resteze
   end
 
   module RateLimited
-    # Seconds to wait before retrying, from the Retry-After header. Accepts
-    # delay-seconds or an HTTP-date; nil when absent or unparseable.
+    # `retry_after:` sets the wait outright, for errors raised before a
+    # request is sent (see RateLimiter's on_wait: :raise).
+    def initialize(message = nil, retry_after: nil, **keyword_args)
+      super(message, **keyword_args)
+      @retry_after = retry_after
+    end
+
+    # Seconds to wait before retrying: the value given at construction, else
+    # the HTTP Retry-After header, accepting delay-seconds or an HTTP-date;
+    # nil when absent or unparseable. Redefine on MyApi::RateLimitError for
+    # an API that signals the wait some other way.
     def retry_after
+      @retry_after || retry_after_header
+    end
+
+    private
+
+    def retry_after_header
       value = header("Retry-After")
       return if value.blank?
       return Integer(value) if value.to_s.match?(/\A\d+\z/)

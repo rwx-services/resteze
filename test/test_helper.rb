@@ -135,6 +135,31 @@ module BodyApi
     end
   end
 
+  # Braze-style: quota in X-RateLimit-* headers, retry a 429 twice.
+  class RateLimiter
+    def before_request(*, **)
+      synchronize { |state| state[:requests] = state.fetch(:requests, 0) + 1 }
+      super
+    end
+
+    def track(response)
+      limit = rate_limit(response)
+      update_state(remaining: limit.remaining, reset: limit.reset) if limit
+    end
+
+    def rate_limit(response)
+      Resteze::RateLimit.from_headers(response.http_headers)
+    end
+
+    def retry?(_error, attempt)
+      attempt <= 2
+    end
+
+    def retry_after(error)
+      error.retry_after || 0
+    end
+  end
+
   class User < ApiResource
     action :track, method: :post
   end

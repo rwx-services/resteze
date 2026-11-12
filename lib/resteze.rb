@@ -21,10 +21,12 @@ require "resteze/object"
 
 # API Classes
 require "resteze/instrumentation"
+require "resteze/rate_limit"
+require "resteze/rate_limiter"
+require "resteze/rate_limiting"
 require "resteze/client"
 require "resteze/errors"
 require "resteze/list_object"
-require "resteze/rate_limit"
 require "resteze/response"
 require "resteze/result"
 require "resteze/util"
@@ -104,16 +106,32 @@ module Resteze
                     :open_timeout,
                     :read_timeout,
                     :logger,
-                    :proxy,
-                    :rate_limit_headers
+                    :proxy
+
+      # One RateLimiter per API module, shared by every thread. Defaults to
+      # an instance of the module's own RateLimiter class; assign another to
+      # replace it (nil restores the default). Whatever is assigned is told
+      # which module it serves, so it raises this module's errors.
+      def rate_limiter
+        @rate_limiter || @rate_limiter_mutex.synchronize { @rate_limiter ||= adopt_rate_limiter(self::RateLimiter.new) }
+      end
+
+      def rate_limiter=(limiter)
+        @rate_limiter = adopt_rate_limiter(limiter)
+      end
+
+      def adopt_rate_limiter(limiter)
+        limiter.api_module = self if limiter.respond_to?(:api_module=)
+        limiter
+      end
     end
+    @rate_limiter_mutex = Mutex.new
 
     configure do |config|
       config.api_base = "http://example.com/"
       config.open_timeout = 30
       config.read_timeout = 60
       config.logger = Logger.new($stdout)
-      config.rate_limit_headers = Resteze::RateLimit::DEFAULT_HEADERS
     end
 
     # Setup magic constants
@@ -123,6 +141,7 @@ module Resteze
     const_set :Response,    Class.new(Resteze::Response)
     const_set :Result,      Class.new(Resteze::Result)
     const_set :Error,       Class.new(Resteze::Error)
+    const_set :RateLimiter, Class.new(Resteze::RateLimiter)
     Resteze::Errors.define(self, self::Error)
 
     # Namespace other exceptions that we want to be able to catch and make sense of

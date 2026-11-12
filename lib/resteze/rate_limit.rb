@@ -1,7 +1,8 @@
 module Resteze
-  # Rate-limit state reported by an API's response headers. Built by
-  # Response#rate_limit and Error#rate_limit from the header names in the
-  # module's `rate_limit_headers` configuration.
+  # The value RateLimiter#rate_limit returns: a quota, the calls remaining
+  # and the reset. Strategies build it in `describe`; `from_headers` reads
+  # the common three-header shape, which FixedWindow uses with
+  # `headers: true` and a custom strategy or limiter may use directly.
   class RateLimit
     DEFAULT_HEADERS = {
       limit: "X-RateLimit-Limit",
