@@ -15,7 +15,29 @@ module Resteze
           status: response.http_status,
           headers: response.http_headers
         )
+
+        error = body_error(response)
+        raise error if error
       end
+    end
+
+    # Override in MyApi::Response for APIs that report failures inside a
+    # successful HTTP response. Receives the parsed Response after the
+    # status-based middleware has accepted it; return an exception to raise
+    # it, or nil to accept the response.
+    #
+    #   module MyApi
+    #     class Response
+    #       def self.body_error(response)
+    #         data = response.data
+    #         return unless data.is_a?(Hash) && data[:errors].present?
+    #
+    #         ApiError.from_response(response, data[:message])
+    #       end
+    #     end
+    #   end
+    def self.body_error(_response)
+      nil
     end
 
     def self.batch_response?(headers)

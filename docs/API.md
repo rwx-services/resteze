@@ -225,6 +225,8 @@ response.success?      # true for any 2xx status
 response.ok?           # true only for 200
 ```
 
+For APIs that report failures inside a successful response, override `MyApi::Response.body_error` to return an error to raise; see [Errors Reported in a 2xx Body](ERROR_HANDLING.md#errors-reported-in-a-2xx-body).
+
 ### Working with Objects
 
 ```ruby

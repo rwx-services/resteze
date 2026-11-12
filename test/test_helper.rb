@@ -118,6 +118,33 @@ WrapApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
+# An API that reports failures inside a 2xx body, Braze-style:
+# { "message": "success" } or { "message": "...", "errors": [...] }.
+module BodyApi
+  include Resteze
+
+  class Response
+    SUCCESS = %w[success queued].freeze
+
+    def self.body_error(response)
+      data = response.data
+      return unless data.is_a?(Hash)
+      return if SUCCESS.include?(data[:message]) && data[:errors].blank?
+
+      ApiError.from_response(response, data[:message] || "errors in response body")
+    end
+  end
+
+  class User < ApiResource
+    action :track, method: :post
+  end
+end
+
+BodyApi.configure do |config|
+  config.api_base = "http://body.example.com/"
+  config.logger = Logger.new(nil)
+end
+
 def configure_gem!
   AcmeApi.configure do |config|
     config.api_base = "http://acme.example.com/"

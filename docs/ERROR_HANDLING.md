@@ -5,6 +5,7 @@
 - [Built-in Error Types](#built-in-error-types)
 - [Error Attributes](#error-attributes)
 - [Handling Errors](#handling-errors)
+- [Errors Reported in a 2xx Body](#errors-reported-in-a-2xx-body)
 - [Custom Error Classes](#custom-error-classes)
 - [Middleware Error Handling](#middleware-error-handling)
 - [Best Practices](#best-practices)
@@ -310,6 +311,37 @@ end
 # Usage
 user = RetryableRequest.execute { MyApi::User.retrieve('123') }
 ```
+
+## Errors Reported in a 2xx Body
+
+Some APIs answer with a successful HTTP status and put the failure in the body. Braze, for example, returns `201 Created` with `{"message": "success", "errors": [...]}` when some records in a batch were rejected, and `200 OK` with `{"message": "Invalid API key"}` for others. The status-based middleware cannot see these.
+
+Override `body_error` on your module's `Response`. It receives the parsed `Response` after the middleware has accepted the status. Return an exception to raise it, or `nil` to accept the response. `Error.from_response` builds a namespaced error that carries the status, headers, body and parsed `json_body`, with the `Response` itself as `e.response`:
+
+```ruby
+module MyApi
+  class Response
+    SUCCESS = %w[success queued].freeze
+
+    def self.body_error(response)
+      data = response.data
+      return unless data.is_a?(Hash)
+      return if SUCCESS.include?(data[:message]) && data[:errors].blank?
+
+      ApiError.from_response(response, data[:message] || "errors in response body")
+    end
+  end
+end
+
+begin
+  MyApi::User.track(events: batch)
+rescue MyApi::ApiError => e
+  e.http_status          # 201
+  e.json_body[:errors]   # the per-record errors
+end
+```
+
+The hook runs inside `execute_request`, so the error is instrumented with its status like any other, and `rescue MyApi::Error` catches it. Return a subclass of `ApiError` if callers need to tell partial success apart from a hard failure.
 
 ## Custom Error Classes
 

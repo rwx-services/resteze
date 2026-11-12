@@ -135,6 +135,39 @@ module Resteze
       end
     end
 
+    describe ".from_response" do
+      def response(data, status: 201, body: "{}", headers: { "Request-Id" => "req_r" })
+        Resteze::Response.new.tap do |r|
+          r.data = data
+          r.http_status = status
+          r.http_body = body
+          r.http_headers = headers
+        end
+      end
+
+      it "copies the response onto the error" do
+        error = Resteze::ApiError.from_response(response({ message: "nope" }), "failed")
+
+        assert_equal "failed",           error.message
+        assert_equal 201,                error.http_status
+        assert_equal "{}",               error.http_body
+        assert_equal "req_r",            error.http_headers["Request-Id"]
+        assert_equal({ message: "nope" }, error.json_body)
+        assert_kind_of Resteze::Response, error.response
+      end
+
+      it "leaves json_body nil for a non-structured body" do
+        assert_nil Resteze::ApiError.from_response(response("plain text")).json_body
+      end
+
+      it "builds an InvalidRequestError with no param" do
+        error = Resteze::InvalidRequestError.from_response(response({}), "bad")
+
+        assert_equal "bad", error.message
+        assert_nil error.param
+      end
+    end
+
     describe "RateLimitError#retry_after" do
       def rate_limit_error(headers)
         Resteze::RateLimitError.new("slow down", http_status: 429, http_headers: headers)
