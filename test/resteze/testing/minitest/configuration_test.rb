@@ -6,26 +6,40 @@ module Resteze
     class MinitestConfigurationTest < ::Minitest::Spec
       include Resteze::Testing::Configuration
 
+      # A config object whose writer records assignments but never changes the value.
+      class Stubborn
+        attr_reader :mode, :writes
+
+        def initialize
+          @mode = :fixed
+          @writes = []
+        end
+
+        def mode=(value)
+          @writes << value
+        end
+      end
+
       subject { AcmeApi }
 
-      it "passes when the config property holds the value" do
-        assert_config_property :open_timeout, 30
+      it "assigns the value, asserts it round-trips, and restores the original" do
+        assert_config_property :open_timeout, 5
+
+        assert_equal 30, AcmeApi.open_timeout
       end
 
       it "accepts an explicit subject" do
-        assert_config_property :read_timeout, 60, subject: AcmeApi
+        assert_config_property :read_timeout, 10, subject: AcmeApi
+
+        assert_equal 60, AcmeApi.read_timeout
       end
 
-      it "reports a mismatched value" do
-        error = assert_raises(::Minitest::Assertion) { assert_config_property :open_timeout, 5 }
+      it "reports a value the writer does not keep and still restores the original" do
+        stubborn = Stubborn.new
+        error = assert_raises(::Minitest::Assertion) { assert_config_property :mode, :loose, subject: stubborn }
 
-        assert_match(/open_timeout/, error.message)
-      end
-
-      it "leaves the config value in place" do
-        assert_config_property :open_timeout, 30
-
-        assert_equal 30, AcmeApi.open_timeout
+        assert_match(/mode/, error.message)
+        assert_equal %i[loose fixed], stubborn.writes
       end
     end
   end

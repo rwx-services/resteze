@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
 - `Response.parse_body` returns a blank body unparsed instead of raising `JSON::ParserError`, so a `200 OK` with an empty body no longer fails.
 - `include Resteze` now defines `MyApi::Result`, so `Result` joins `Object`, `Client`, `Response` and the other reserved constant names inside an API module.
 
+### Fixed
+
+- `assert_config_property` (Minitest and RSpec) now assigns the given value before asserting it reads back, then restores the original. It previously only compared the current value.
+
 ## [0.3.1]
 
 ### Added
