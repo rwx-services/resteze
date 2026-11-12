@@ -53,8 +53,13 @@ module MyCoolApi
   # Configure your API client
   configure do |config|
     config.api_base = 'https://api.example.com/'
-    config.api_key = 'your-api-key'
     config.logger = Logger.new($stdout)
+  end
+
+  # Say how the API authenticates: :api_key, :basic, :bearer or :mtls,
+  # with the credential as a callable so it is read on each request
+  class Authenticator
+    strategy :bearer, token: -> { ENV.fetch('MY_COOL_API_TOKEN') }
   end
 
   # Define a resource

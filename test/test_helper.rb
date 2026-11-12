@@ -170,6 +170,27 @@ BodyApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
+# An API authenticated with a header API key.
+module AuthApi
+  include Resteze
+
+  class Authenticator
+    strategy :api_key, header: "X-Api-Key", value: -> { "secret-key" }
+  end
+
+  class Widget < ApiResource
+    include Save
+
+    property :id
+    property :name
+  end
+end
+
+AuthApi.configure do |config|
+  config.api_base = "http://auth.example.com/"
+  config.logger = Logger.new(nil)
+end
+
 def configure_gem!
   AcmeApi.configure do |config|
     config.api_base = "http://acme.example.com/"

@@ -2,6 +2,7 @@
 
 ## Table of Contents
 - [Basic Configuration](#basic-configuration)
+- [Authentication](#authentication)
 - [Environment-based Configuration](#environment-based-configuration)
 - [Dynamic Configuration](#dynamic-configuration)
 - [Connection Configuration](#connection-configuration)
@@ -81,6 +82,76 @@ module MyApi
   end
 end
 ```
+
+## Authentication
+
+Each module gets a `MyApi::Authenticator`, a subclass of `Resteze::Authenticator` that does nothing until you choose a scheme. `strategy` names a built-in and hands it the credential; every credential option takes a value or a callable, and a callable is called on each request so a rotated key takes effect without a restart:
+
+```ruby
+module MyApi
+  include Resteze
+
+  class Authenticator
+    strategy :api_key, header: 'X-Api-Key', value: -> { ENV.fetch('MY_API_KEY') }
+  end
+end
+```
+
+| Scheme | Options | Sends |
+|---|---|---|
+| `:api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
+| `:basic` | `username:`, `password:` | `Authorization: Basic …` |
+| `:bearer` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
+| `:mtls` | `cert:`, `key:`, `ca_file:`, `passphrase:`, `verify:` | a client certificate on the TLS connection |
+
+Schemes combine; call `strategy` once per scheme. `cert:` and `key:` for `:mtls` are PEM strings, paths, or callables returning either. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
+
+### The lifecycle
+
+The client calls the authenticator at three points: `connection_options` when the per-thread connection is built, `apply(request)` before every request (with `headers`, `params` and `query` to mutate; `query` always goes in the query string), and `refresh?(error, attempt)` after a `MyApi::AuthenticationError`, where returning `true` sends the request once more with a renewed credential. The built-ins never refresh.
+
+### Custom schemes
+
+Every built-in is a subclass of `Resteze::Authenticator::Strategy`, and a custom scheme is the same: implement `apply(request, state)`, and `connection_options` or `refresh?(error, attempt, state)` when needed. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
+
+```ruby
+module MyApi
+  class SessionToken < Resteze::Authenticator::Strategy
+    def initialize(login_url:, username:, password:)
+      super()
+      @login_url, @username, @password = login_url, username, password
+    end
+
+    def apply(request, state)
+      state[:session_token] ||= login
+      request.headers['X-Session-Token'] = state[:session_token]
+    end
+
+    def refresh?(_error, attempt, state)
+      return false if attempt > 1
+
+      state[:session_token] = login
+      true
+    end
+
+    private
+
+    def login
+      body = { username: resolve(@username), password: resolve(@password) }.to_json
+      JSON.parse(Faraday.post(@login_url, body, 'Content-Type' => 'application/json').body).fetch('token')
+    end
+  end
+
+  class Authenticator
+    strategy SessionToken, login_url: 'https://api.example.com/login',
+                           username: -> { ENV.fetch('API_USER') }, password: -> { ENV.fetch('API_PASS') }
+  end
+end
+```
+
+OAuth 2.0 and signed JWTs fit the same shape but need extra dependencies, so they are meant to ship as separate gems providing a `Strategy` subclass. Until then, hand an externally obtained token to `:bearer` through a callable.
+
+`MyApi.authenticator` is the instance the client uses; assign another to replace it (tests do this to swap credentials) or `nil` to restore the default. `Client#request_headers` remains overridable for headers that are not a credential.
 
 ## Environment-based Configuration
 

@@ -17,6 +17,7 @@ Metrics/ParameterLists:
 Metrics/AbcSize:
   Exclude:
     - lib/resteze/response.rb
+    - test/**/*
 
 Metrics/BlockLength:
   Exclude:

@@ -149,7 +149,11 @@ class RestezeTest < Minitest::Spec
     assert_config_property(:open_timeout, 30)
     assert_config_property(:read_timeout, 45)
     assert_config_property(:proxy)
+  end
+
+  it "should support the shared component config properties" do
     assert_config_property(:rate_limiter, Resteze::RateLimiter.new)
+    assert_config_property(:authenticator, Resteze::Authenticator.new)
   end
 
   it "should support custom config properties" do
@@ -228,6 +232,7 @@ class RestezeTest < Minitest::Spec
         ApiError
         RateLimitError
         RateLimiter
+        Authenticator
         NotImplementedError
         ResourceNotFound
         UnprocessableEntityError

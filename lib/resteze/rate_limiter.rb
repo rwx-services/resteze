@@ -64,6 +64,7 @@ module Resteze
   # thread's bookkeeping.
   class RateLimiter
     include Resteze::ApiModule
+    include Resteze::SynchronizedState
 
     ON_WAIT          = %i[sleep raise].freeze
     DEFAULT_MAX_WAIT = 3600
@@ -121,8 +122,7 @@ module Resteze
 
     def initialize(strategy: self.class.strategy_instance, on_wait: self.class.on_wait,
                    max_wait: self.class.max_wait, clock: nil, sleeper: nil)
-      @mutex    = Mutex.new
-      @state    = {}
+      initialize_state
       @strategy = strategy
       @on_wait  = self.class.validate_on_wait(on_wait)
       @max_wait = self.class.validate_max_wait(max_wait)
@@ -192,23 +192,6 @@ module Resteze
         @sleeper.call(seconds) if seconds.positive?
         seconds
       end
-    end
-
-    # A deep-copied snapshot of the limiter's state.
-    def state
-      synchronize(&:deep_dup)
-    end
-
-    def update_state(**values)
-      synchronize { |state| state.merge!(values) }
-    end
-
-    # Yields the live state hash under the lock. Re-entrant, so `state` and
-    # `update_state` may be called inside the block.
-    def synchronize
-      return yield(@state) if @mutex.owned?
-
-      @mutex.synchronize { yield(@state) }
     end
 
     private
