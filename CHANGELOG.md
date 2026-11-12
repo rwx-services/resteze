@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - `Response.parse_body` returns a blank body unparsed instead of raising `JSON::ParserError`, so a `200 OK` with an empty body no longer fails.
 - `include Resteze` now defines `MyApi::Result`, so `Result` joins `Object`, `Client`, `Response` and the other reserved constant names inside an API module.
 - The `RaiseError` middleware now maps every Faraday error onto the API module's hierarchy: 401/403 to `AuthenticationError`, 429 to `RateLimitError`, 400 to `InvalidRequestError`, other 4xx and all 5xx to `ApiError`, and connection failures, timeouts and SSL errors to `ApiConnectionError`. Previously only 404, 409 and 422 were namespaced and everything else surfaced as a raw Faraday error that `rescue MyApi::Error` could not catch. The Faraday error is kept as `cause`.
+- **Breaking:** `MyApi::ResourceNotFound`, `MyApi::ConflictError` and `MyApi::UnprocessableEntityError` are now subclasses of `MyApi::Error` like every other error, so `rescue MyApi::Error` catches a 404, 409 or 422. They no longer descend from the Faraday classes; a `rescue Faraday::ResourceNotFound` must become `rescue MyApi::ResourceNotFound`. Their Faraday-style readers (`response_status`, `response_headers`, `response_body`, `response`) still work, and are now available on every `MyApi::Error`.
 
 ### Fixed
 
