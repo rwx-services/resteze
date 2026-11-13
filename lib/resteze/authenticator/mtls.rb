@@ -64,8 +64,9 @@ module Resteze
       end
 
       def warn_unverified
-        logger = api_module.try(:logger) || Logger.new($stderr)
-        logger.warn("#{api_module || 'This API'} uses mTLS with verify: false, so the server's certificate is not checked")
+        message = "#{api_module || 'This API'} uses mTLS with verify: false, so the server's certificate is not checked"
+        logger  = api_module.try(:logger)
+        logger ? logger.warn(message) : warn(message)
       end
     end
   end

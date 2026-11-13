@@ -14,9 +14,11 @@ module Resteze
         end
       end
 
-      def configure_pem!
+      # Declares the mTLS settings on AuthApi and fills the certificate and
+      # key with a self-signed pair, returned for assertions.
+      def install_self_signed!
         cert, key = self_signed
-        Class.new(AuthApi::Authenticator) { strategy :mtls }
+        declare_settings_for(Mtls)
         AuthApi.client_cert = cert.to_pem
         AuthApi.client_key  = key.to_pem
         [cert, key]
@@ -49,7 +51,7 @@ module Resteze
       end
 
       it "builds the connection from PEM in the module's settings, alongside another scheme" do
-        cert, key = configure_pem!
+        cert, key = install_self_signed!
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new(ca_file: "/tmp/ca.pem"), ApiKey.new])
         Thread.current[CONNECTION_KEY] = nil
 
@@ -62,7 +64,7 @@ module Resteze
       end
 
       it "reads the CA bundle from the module's ca_file setting and reports nothing missing without a passphrase" do
-        configure_pem!
+        install_self_signed!
         AuthApi.ca_file = "/tmp/bundle.pem"
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new])
 
@@ -72,7 +74,7 @@ module Resteze
       end
 
       it "logs a warning whenever a connection is built with verify: false" do
-        configure_pem!
+        install_self_signed!
         log = StringIO.new
         AuthApi.logger = Logger.new(log)
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new(verify: false)])
@@ -110,7 +112,7 @@ module Resteze
       end
 
       it "names the missing setting when the connection is built, and rejects nil options" do
-        Class.new(AuthApi::Authenticator) { strategy :mtls }
+        declare_settings_for(Mtls)
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new])
         Thread.current[CONNECTION_KEY] = nil
 

@@ -57,6 +57,7 @@ module Resteze
 
         assert_match(/AuthApi\.api_key is not set; the bearer authentication strategy needs it/, error.message)
         assert_raises(ArgumentError) { Bearer.new(token: nil) }
+        assert_raises(ArgumentError) { Bearer.new(scheme: nil) }
       ensure
         AuthApi.api_key = "secret-key"
       end

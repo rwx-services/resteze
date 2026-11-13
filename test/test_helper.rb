@@ -228,6 +228,12 @@ module MacroApi
   rate_limit_with :token_bucket, capacity: 5, refill_rate: 1
 end
 
+# Declares a scheme's settings on AuthApi (`AuthApi.username=` and so on)
+# the way `authenticate_with` would, without adding the scheme to it.
+def declare_settings_for(strategy_class, **options)
+  AuthApi::Authenticator.declare_settings(strategy_class.settings(options))
+end
+
 def configure_gem!
   AcmeApi.configure do |config|
     config.api_base = "http://acme.example.com/"

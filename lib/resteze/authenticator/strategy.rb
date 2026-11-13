@@ -45,13 +45,18 @@ module Resteze
 
       # The module settings these options (over the defaults) read.
       def self.settings(options = {})
-        self::DEFAULTS.merge(options).values.grep(Symbol)
+        effective_options(options).values.grep(Symbol)
       end
 
       # Those of them the scheme cannot work without.
       def self.required_settings(options = {})
-        self::DEFAULTS.merge(options).except(*self::OPTIONAL).values.grep(Symbol)
+        effective_options(options).except(*self::OPTIONAL).values.grep(Symbol)
       end
+
+      def self.effective_options(options)
+        self::DEFAULTS.merge(options)
+      end
+      private_class_method :effective_options
 
       # The module settings this instance reads: DEFAULTS as overridden by
       # the credential options it was built with.

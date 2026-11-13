@@ -140,6 +140,19 @@ module Resteze
         assert_equal %i[other],           with_optional.required_settings(token: :other)
       end
 
+      it "reports the authenticator's settings and required settings across its strategies" do
+        with_optional = Class.new(Authenticator::Strategy) do
+          const_set(:DEFAULTS, { token: :api_token, realm: :realm }.freeze)
+          const_set(:OPTIONAL, %i[realm].freeze)
+        end
+        klass = Class.new(Resteze::Authenticator) { strategy with_optional }
+
+        assert_equal %i[api_token realm], klass.settings
+        assert_equal %i[api_token],       klass.required_settings
+        assert_equal %i[api_token realm], klass.new.settings
+        assert_equal %i[api_token],       klass.new.required_settings
+      end
+
       it "reports an instance's settings from DEFAULTS when a scheme declares no credential options" do
         with_defaults = Class.new(Authenticator::Strategy) { const_set(:DEFAULTS, { token: :api_token }.freeze) }
 

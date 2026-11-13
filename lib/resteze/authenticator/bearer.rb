@@ -16,7 +16,7 @@ module Resteze
       def initialize(token: DEFAULTS[:token], scheme: "Bearer")
         super()
         @token  = required!(:token, token)
-        @scheme = scheme
+        @scheme = required!(:scheme, scheme)
       end
 
       def credential_options

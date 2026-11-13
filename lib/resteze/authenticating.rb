@@ -8,10 +8,7 @@ module Resteze
       authenticator = api_module.authenticator
       attempt = 0
       begin
-        request = Authenticator::Request.new(http_method: method, path:,
-                                             headers: options.fetch(:headers, {}).dup,
-                                             params: options.fetch(:params, {}).dup,
-                                             query: options.fetch(:query, {}).dup)
+        request = Authenticator::Request.new(http_method: method, path:, **mutable_copies(options))
         authenticator.apply(request)
         super(method, path, **options, headers: request.headers, params: request.params, query: request.query)
       rescue api_module::AuthenticationError => e
@@ -19,6 +16,13 @@ module Resteze
 
         retry
       end
+    end
+
+    private
+
+    # The strategies get copies to add to, so the caller's hashes survive.
+    def mutable_copies(options)
+      %i[headers params query].to_h { |key| [key, options.fetch(key, {}).dup] }
     end
   end
 end

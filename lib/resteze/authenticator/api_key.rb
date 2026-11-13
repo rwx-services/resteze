@@ -19,7 +19,7 @@ module Resteze
 
         @value  = required!(:value, value)
         @query  = query
-        @header = header || ("X-Api-Key" unless query)
+        @header = query ? nil : (header || "X-Api-Key")
       end
 
       def credential_options
