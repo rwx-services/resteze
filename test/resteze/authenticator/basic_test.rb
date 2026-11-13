@@ -19,8 +19,8 @@ module Resteze
         assert_equal %i[api_user api_secret], Basic.settings(username: :api_user, password: :api_secret)
       end
 
-      it "declares the settings when chosen and sends them as HTTP Basic" do
-        Class.new(AuthApi::Authenticator) { strategy :basic }
+      it "sends the module's username and password as HTTP Basic" do
+        declare_settings_for(Basic)
         AuthApi.username = "u"
         AuthApi.password = "p"
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Basic.new])
@@ -30,7 +30,8 @@ module Resteze
 
         assert_requested :get, URL, times: 1
       ensure
-        AuthApi.username = AuthApi.password = nil
+        AuthApi.username = nil
+        AuthApi.password = nil
       end
 
       it "encodes username:password in base64 and allows an empty password" do
@@ -45,8 +46,14 @@ module Resteze
         assert_equal "Basic #{['secret:'].pack('m0')}", req.headers["Authorization"]
       end
 
+      it "refuses a username containing a colon, which the server would split" do
+        error = assert_raises(ArgumentError) { Basic.new(username: "acme:ops", password: "p").apply(request, {}) }
+
+        assert_match(/username "acme:ops" contains ':'/, error.message)
+      end
+
       it "names the missing setting" do
-        Class.new(AuthApi::Authenticator) { strategy :basic }
+        declare_settings_for(Basic)
         AuthApi.username = "u"
         AuthApi.password = nil
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Basic.new])

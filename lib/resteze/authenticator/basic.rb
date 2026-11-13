@@ -19,8 +19,14 @@ module Resteze
         { username: @username, password: @password }
       end
 
+      # A username cannot contain a colon (RFC 7617): the server splits on
+      # the first one, so "acme:ops" would log in as "acme" and fail with a
+      # bare 401. Better to say so here.
       def apply(request, _state)
-        credentials = "#{resolve!(:username, @username)}:#{resolve!(:password, @password)}"
+        username = resolve!(:username, @username).to_s
+        raise ArgumentError, "the basic authentication username #{username.inspect} contains ':'" if username.include?(":")
+
+        credentials = "#{username}:#{resolve!(:password, @password)}"
         request.headers["Authorization"] = "Basic #{[credentials].pack('m0')}"
       end
 

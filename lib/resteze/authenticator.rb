@@ -78,6 +78,11 @@ module Resteze
         strategy_specs.flat_map { |klass, options| klass.settings(options) }.uniq
       end
 
+      # Those of them the strategies cannot work without.
+      def required_settings
+        strategy_specs.flat_map { |klass, options| klass.required_settings(options) }.uniq
+      end
+
       # Declares those settings on the API module (`api_key`, `username`,
       # ...) so an initializer can set them through `configure` with no
       # `attr_accessor` of its own. Existing accessors are left alone.
@@ -130,13 +135,18 @@ module Resteze
       strategies.flat_map(&:settings).uniq
     end
 
-    # Those settings the strategies cannot work without that are still nil,
-    # for checking configuration at boot (a strategy's OPTIONAL settings,
-    # such as a key passphrase, are not reported):
+    # Those of them the strategies cannot work without (a strategy's
+    # OPTIONAL settings, such as a key passphrase, are left out).
+    def required_settings
+      strategies.flat_map(&:required_settings).uniq
+    end
+
+    # The required settings that are still nil, for checking configuration
+    # at boot:
     #
     #   raise "MyApi needs #{MyApi.authenticator.missing_settings.join(', ')}" if MyApi.authenticator.missing_settings.any?
     def missing_settings
-      strategies.flat_map(&:required_settings).uniq.select { |name| api_module.try(name).nil? }
+      required_settings.select { |name| api_module.try(name).nil? }
     end
 
     # Faraday connection options merged from every strategy, such as `ssl:`.
