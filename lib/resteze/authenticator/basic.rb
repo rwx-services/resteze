@@ -19,6 +19,10 @@ module Resteze
         { username: @username, password: @password }
       end
 
+      def sensitive_keys
+        { headers: ["Authorization"] }
+      end
+
       # A username cannot contain a colon (RFC 7617): the server splits on
       # the first one, so "acme:ops" would log in as "acme" and fail with a
       # bare 401. Better to say so here.

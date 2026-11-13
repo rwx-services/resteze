@@ -46,6 +46,16 @@ module Resteze
         assert_equal "Basic #{['secret:'].pack('m0')}", req.headers["Authorization"]
       end
 
+      it "keeps the credentials out of the debug log" do
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Basic.new(username: "user", password: "pass")])
+        stub_request(:get, URL).to_return(body: "{}")
+
+        log = capture_debug_log(AuthApi) { AuthApi::Client.new.execute_request(:get, "/widgets/1") }
+
+        refute_includes log, "dXNlcjpwYXNz"
+        assert_includes log, "Authorization: [REDACTED]"
+      end
+
       it "refuses a username containing a colon, which the server would split" do
         error = assert_raises(ArgumentError) { Basic.new(username: "acme:ops", password: "p").apply(request, {}) }
 

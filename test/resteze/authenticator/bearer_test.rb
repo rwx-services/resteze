@@ -43,6 +43,16 @@ module Resteze
         assert_equal "Bearer literal", req.headers["Authorization"]
       end
 
+      it "keeps the token out of the debug log" do
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Bearer.new])
+        stub_request(:get, URL).to_return(body: "{}")
+
+        log = capture_debug_log(AuthApi) { AuthApi::Client.new.execute_request(:get, "/widgets/1") }
+
+        refute_includes log, "secret-key"
+        assert_includes log, "Authorization: [REDACTED]"
+      end
+
       it "declares another setting when told to read one" do
         Class.new(AuthApi::Authenticator) { strategy :bearer, token: :access_token }
 

@@ -23,6 +23,10 @@ module Resteze
         { token: @token }
       end
 
+      def sensitive_keys
+        { headers: ["Authorization"] }
+      end
+
       def apply(request, _state)
         request.headers["Authorization"] = "#{scheme} #{resolve!(:token, @token)}"
       end

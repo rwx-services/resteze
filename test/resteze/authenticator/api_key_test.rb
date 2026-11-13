@@ -54,6 +54,19 @@ module Resteze
         assert_equal 2, widget.id
       end
 
+      it "keeps the key out of the debug log, in a header or in the query string" do
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [ApiKey.new(header: "X-Partner-Key"),
+                                                                        ApiKey.new(query: "api_key")])
+        stub_request(:get, URL).with(query: { "api_key" => "secret-key" }).to_return(body: "{}")
+
+        log = capture_debug_log(AuthApi) { AuthApi::Client.new.execute_request(:get, "/widgets/1") }
+
+        assert_equal({ headers: ["X-Partner-Key"], query: ["api_key"] }, AuthApi.authenticator.sensitive_keys)
+        refute_includes log, "secret-key"
+        assert_includes log, "X-Partner-Key: [REDACTED]"
+        assert_includes log, "api_key=%5BREDACTED%5D"
+      end
+
       it "rejects header: and query: together and a nil value" do
         assert_raises(ArgumentError) { ApiKey.new(header: "H", query: "q") }
         assert_raises(ArgumentError) { ApiKey.new(value: nil) }

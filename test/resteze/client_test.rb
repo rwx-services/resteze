@@ -206,6 +206,25 @@ module Resteze
       end
     end
 
+    describe "the debug log" do
+      it "masks Authorization and Proxy-Authorization even when request_headers adds them" do
+        client = Class.new(AcmeApi::Client) do
+          def request_headers = super.merge("Authorization" => "Bearer raw-token", "Proxy-Authorization" => "Basic p")
+        end
+        stub_request(:get, api_url("/widgets/1")).to_return(body: "{}")
+
+        headers = { "X-Plain" => "shown" }
+
+        log = capture_debug_log(AcmeApi) { client.new.execute_request(:get, "/widgets/1", headers:) }
+
+        assert_requested(:get, api_url("/widgets/1"), headers: { "Authorization" => "Bearer raw-token" })
+        refute_match(/raw-token|Basic p/, log)
+        assert_includes log, "Authorization: [REDACTED]"
+        assert_includes log, "Proxy-Authorization: [REDACTED]"
+        assert_includes log, "X-Plain: shown"
+      end
+    end
+
     describe "params serialization" do
       before do
         stub_request(:get, api_url("/invoices/upcoming"))
