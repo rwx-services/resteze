@@ -6,7 +6,7 @@ module Resteze
     attr_reader   :message, :code, :http_body, :http_headers, :http_status, :json_body
 
     # Faraday-style readers, for code written against the Faraday-derived
-    # ResourceNotFound, ConflictError and UnprocessableEntityError of 0.5.0.
+    # ResourceNotFound, ConflictError and UnprocessableEntityError of 0.4.0.
     alias response_status  http_status
     alias response_headers http_headers
     alias response_body    http_body

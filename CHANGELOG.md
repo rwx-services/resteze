@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0]
+## [1.0.0]
+
+The release developed as 0.5.0, renumbered: it is the first stable release, and the error hierarchy change under **Changed** breaks code written against the Faraday-derived classes.
 
 ### Added
 
