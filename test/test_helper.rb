@@ -228,6 +228,18 @@ module MacroApi
   rate_limit_with :token_bucket, capacity: 5, refill_rate: 1
 end
 
+# Runs the block with the module logging at DEBUG into a string, which is
+# returned, so a test can look at what the client wrote.
+def capture_debug_log(mod)
+  log      = StringIO.new
+  previous = mod.logger
+  mod.logger = Logger.new(log).tap { |logger| logger.level = Logger::DEBUG }
+  yield
+  log.string
+ensure
+  mod.logger = previous
+end
+
 # Declares a scheme's settings on AuthApi (`AuthApi.username=` and so on)
 # the way `authenticate_with` would, without adding the scheme to it.
 def declare_settings_for(strategy_class, **options)

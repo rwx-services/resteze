@@ -316,6 +316,40 @@ module Resteze
         assert_requested :get, URL, times: 1
       end
 
+      it "masks the credential in the debug log wherever a strategy puts it, and nowhere else" do
+        everywhere = Class.new(Authenticator::Strategy) do
+          def apply(request, _state)
+            request.headers["X-Token"] = "hdr-secret"
+            request.query[:sig]        = "qry-secret"
+            request.params[:key]       = "body-secret"
+          end
+
+          def sensitive_keys = { headers: ["x-token"], query: [:sig], params: ["key"] }
+        end
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [everywhere.new])
+        widgets = "http://auth.example.com/widgets"
+        stub_request(:post, widgets).with(query: { sig: "qry-secret" }).to_return(body: "{}")
+
+        log = capture_debug_log(AuthApi) { AuthApi::Client.new.execute_request(:post, "/widgets", params: { name: "x" }) }
+
+        assert_requested(:post, widgets, query: { sig: "qry-secret" }, headers: { "X-Token" => "hdr-secret" },
+                                         body: { name: "x", key: "body-secret" })
+        refute_match(/hdr-secret|qry-secret|body-secret/, log)
+        assert_includes log, "X-Token: [REDACTED]"
+        assert_includes log, "sig=%5BREDACTED%5D"
+        assert_includes log, '"key":"[REDACTED]"'
+        assert_includes log, '"name":"x"'
+      end
+
+      it "merges the sensitive keys of every strategy" do
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Authenticator::Bearer.new,
+                                                                        Authenticator::Basic.new,
+                                                                        Authenticator::ApiKey.new(query: "k")])
+
+        assert_equal({ headers: ["Authorization"], query: ["k"] }, AuthApi.authenticator.sensitive_keys)
+        assert_empty Resteze::Authenticator.new.sensitive_keys
+      end
+
       it "leaves a module without strategies untouched" do
         stub_request(:get, api_url("/widgets/1")).to_return(body: "{}")
 

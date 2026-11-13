@@ -19,6 +19,9 @@ module Resteze
   #     After a MyApi::AuthenticationError (401 or 403). Return true to
   #     send the request once more, for schemes whose credential can be
   #     renewed; `attempt` counts failures so far, starting at 1.
+  #   sensitive_keys
+  #     When logging at DEBUG, which prints the whole request. The header,
+  #     query and body keys named here are masked in the logged copy.
   #
   # A scheme is chosen with `authenticate_with` on the module (or `strategy`
   # inside this class), by the name a built-in registered through
@@ -152,6 +155,12 @@ module Resteze
     # Faraday connection options merged from every strategy, such as `ssl:`.
     def connection_options
       strategies.map(&:connection_options).reduce({}) { |merged, options| merged.deep_merge(options) }
+    end
+
+    # The request keys the strategies put credentials under, merged, for
+    # the client to mask in its debug log.
+    def sensitive_keys
+      strategies.map(&:sensitive_keys).reduce({}) { |merged, keys| merged.merge(keys) { |_, mine, theirs| mine | theirs } }
     end
 
     # Lets every strategy add its credential to the request. Returns it.

@@ -54,6 +54,12 @@ module Resteze
       @faraday_adapter ||= default_connection.builder.adapter.name.demodulize.underscore
     end
 
+    REDACTED = "[REDACTED]".freeze
+
+    # Headers masked in the DEBUG log whatever the authenticator declares,
+    # for a credential added through `request_headers` instead.
+    SENSITIVE_HEADERS = %w[Authorization Proxy-Authorization].freeze
+
     # This can be overriden to customize
     def self.api_url(path = "")
       [api_module.api_base.chomp("/".freeze), path].join
@@ -90,7 +96,7 @@ module Resteze
       params = util.objects_to_ids(params)
       body, query_params = process_params(method, params, query)
       headers = request_headers.merge(util.normalize_headers(headers))
-      context = request_log_context(body:, method:, path:, query_params:, headers:)
+      context = request_log_context(body: redacted_body(body, params), method:, path:, query_params:, headers:)
 
       http_resp = execute_request_with_rescues(context) do
         connection.run_request(method, api_url(path), body, headers) do |req|
@@ -136,14 +142,42 @@ module Resteze
       self.class.default_connection.options.params_encoder || Faraday::Utils.default_params_encoder
     end
 
+    # The DEBUG log prints the whole request, so what goes in here is a
+    # copy with the credentials masked; the request itself is untouched.
     def request_log_context(method: nil, path: nil, query_params: nil, headers: nil, body: nil)
       RequestLogContext.new.tap do |context|
         context.method       = method
         context.path         = path
-        context.query_params = params_encoder.encode(query_params)
-        context.headers      = headers
+        context.query_params = params_encoder.encode(redacted(query_params, :query))
+        context.headers      = redacted(headers, :headers)
         context.body         = body
       end
+    end
+
+    # Masks the values under the keys the authenticator's strategies put a
+    # credential in (`part` is :headers, :query or :params), matched
+    # without regard to case. Returns the hash itself when there is
+    # nothing to mask.
+    def redacted(hash, part)
+      return hash if hash.nil?
+
+      keys = sensitive_keys.fetch(part, []).map { |key| key.to_s.downcase }
+      return hash if keys.empty?
+
+      hash.to_h { |key, value| [key, keys.include?(key.to_s.downcase) ? REDACTED : value] }
+    end
+
+    # The body for the log: the serialised one as is, rebuilt from the
+    # masked params only when a strategy put a credential in the body.
+    def redacted_body(body, params)
+      return body if body.nil? || sensitive_keys.fetch(:params, []).empty?
+
+      redacted(params, :params).to_json
+    end
+
+    def sensitive_keys
+      keys = api_module.try(:authenticator)&.sensitive_keys || {}
+      keys.merge(headers: SENSITIVE_HEADERS | keys.fetch(:headers, []))
     end
 
     def execute_request_with_rescues(context)

@@ -26,6 +26,10 @@ module Resteze
         { value: @value }
       end
 
+      def sensitive_keys
+        query ? { query: [query] } : { headers: [header] }
+      end
+
       def apply(request, _state)
         key = resolve!(:value, @value).to_s
         if query

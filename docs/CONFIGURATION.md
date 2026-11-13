@@ -117,9 +117,13 @@ The convention is a default. Any credential option also takes a Symbol naming a 
 
 The client calls the authenticator at three points: `connection_options` when the per-thread connection is built (an override of `Client.default_connection` must pass them to Faraday itself), `apply(request)` before every request (with `headers`, `params` and `query` to mutate; `query` always goes in the query string whatever the method), and `refresh?(error, attempt)` after a `MyApi::AuthenticationError`, where returning `true` sends the request once more with a renewed credential.
 
+### Credentials and the log
+
+At `Logger::DEBUG` the client logs the whole request, headers and query string included. Each strategy names where it put the credential through `sensitive_keys` (`{ headers: [...], query: [...], params: [...] }`), and the client replaces those values with `[REDACTED]` in the logged copy only; the request goes out intact. The built-ins all declare theirs. `Authorization` and `Proxy-Authorization` are masked whatever the strategies say, which also covers a credential added through an overridden `request_headers`.
+
 ### Writing a scheme
 
-Subclass `Resteze::Authenticator::Strategy` and implement `apply(request, state)`; add `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings; list in `OPTIONAL` any the scheme works without, and `missing_settings` will not report them. `resolve` reads an option whether it is a Symbol (from the module), a callable, or a literal; `resolve!` does the same and raises a clear `ArgumentError` on `nil`; `required!(name, value)` in a constructor rejects `nil` for an option that must be given. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
+Subclass `Resteze::Authenticator::Strategy` and implement `apply(request, state)`; add `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings; list in `OPTIONAL` any the scheme works without, and `missing_settings` will not report them. `resolve` reads an option whether it is a Symbol (from the module), a callable, or a literal; `resolve!` does the same and raises a clear `ArgumentError` on `nil`; `required!(name, value)` in a constructor rejects `nil` for an option that must be given. Implement `sensitive_keys` to name the header, query or body keys the credential lands under, or it will appear in the `DEBUG` log. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
 
 ```ruby
 module MyApi
@@ -141,6 +145,10 @@ module MyApi
 
       state[:session_token] = login
       true
+    end
+
+    def sensitive_keys
+      { headers: ['X-Session-Token'] }   # masked in the DEBUG log
     end
 
     private

@@ -80,6 +80,15 @@ module Resteze
         {}
       end
 
+      # Where `apply` puts the credential, so the client's debug log can
+      # mask it there: header names under :headers, query keys under
+      # :query, body keys under :params. Only the logged copy is masked;
+      # the request goes out intact. A scheme that adds a credential and
+      # leaves this empty writes it to the log at DEBUG.
+      def sensitive_keys
+        {}
+      end
+
       # Add the credential to `request.headers`, `request.params` or
       # `request.query`.
       def apply(request, state); end
