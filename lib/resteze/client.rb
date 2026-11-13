@@ -148,20 +148,21 @@ module Resteze
       RequestLogContext.new.tap do |context|
         context.method       = method
         context.path         = path
-        context.query_params = params_encoder.encode(redacted(query_params, :query))
+        context.query_params = params_encoder.encode(redacted(query_params, :query, :params))
         context.headers      = redacted(headers, :headers)
         context.body         = body
       end
     end
 
     # Masks the values under the keys the authenticator's strategies put a
-    # credential in (`part` is :headers, :query or :params), matched
-    # without regard to case. Returns the hash itself when there is
-    # nothing to mask.
-    def redacted(hash, part)
+    # credential in (`parts` are :headers, :query and :params), matched
+    # without regard to case. The query string takes :params keys too,
+    # since params become the query string for GET, HEAD and DELETE.
+    # Returns the hash itself when there is nothing to mask.
+    def redacted(hash, *parts)
       return hash if hash.nil?
 
-      keys = sensitive_keys.fetch(part, []).map { |key| key.to_s.downcase }
+      keys = parts.flat_map { |part| sensitive_keys.fetch(part, []) }.map { |key| key.to_s.downcase }
       return hash if keys.empty?
 
       hash.to_h { |key, value| [key, keys.include?(key.to_s.downcase) ? REDACTED : value] }

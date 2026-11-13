@@ -341,6 +341,21 @@ module Resteze
         assert_includes log, '"name":"x"'
       end
 
+      it "masks a body credential in the query string too, where a GET sends its params" do
+        in_params = Class.new(Authenticator::Strategy) do
+          def apply(request, _state) = request.params[:key] = "qry-secret"
+          def sensitive_keys = { params: [:key] }
+        end
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [in_params.new])
+        stub_request(:get, URL).with(query: { key: "qry-secret", name: "x" }).to_return(body: "{}")
+
+        log = capture_debug_log(AuthApi) { AuthApi::Client.new.execute_request(:get, "/widgets/1", params: { name: "x" }) }
+
+        refute_includes log, "qry-secret"
+        assert_includes log, "key=%5BREDACTED%5D"
+        assert_includes log, "name=x"
+      end
+
       it "merges the sensitive keys of every strategy" do
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Authenticator::Bearer.new,
                                                                         Authenticator::Basic.new,
