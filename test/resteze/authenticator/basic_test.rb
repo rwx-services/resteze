@@ -23,7 +23,7 @@ module Resteze
         Class.new(AuthApi::Authenticator) { strategy :basic }
         AuthApi.username = "u"
         AuthApi.password = "p"
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Basic.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Basic.new])
         stub_request(:get, URL).with(basic_auth: %w[u p]).to_return(body: "{}")
 
         AuthApi::Client.new.execute_request(:get, "/widgets/1")
@@ -49,7 +49,7 @@ module Resteze
         Class.new(AuthApi::Authenticator) { strategy :basic }
         AuthApi.username = "u"
         AuthApi.password = nil
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Basic.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Basic.new])
 
         error = assert_raises(ArgumentError) { AuthApi.authenticator.apply(request) }
 

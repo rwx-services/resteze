@@ -17,7 +17,7 @@ Metrics/ParameterLists:
 Metrics/AbcSize:
   Exclude:
     - lib/resteze/response.rb
-    - test/**/*
+    - test/resteze/authenticator/mtls_test.rb # building a self-signed certificate
 
 Metrics/BlockLength:
   Exclude:

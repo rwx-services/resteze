@@ -10,7 +10,7 @@ module Resteze
       begin
         request = Authenticator::Request.new(http_method: method, path:,
                                              headers: options.fetch(:headers, {}).dup,
-                                             params: options.fetch(:params, {}),
+                                             params: options.fetch(:params, {}).dup,
                                              query: options.fetch(:query, {}).dup)
         authenticator.apply(request)
         super(method, path, **options, headers: request.headers, params: request.params, query: request.query)

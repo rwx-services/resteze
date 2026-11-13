@@ -13,9 +13,9 @@ module Resteze
 
       attr_reader :scheme
 
-      def initialize(token: :api_key, scheme: "Bearer")
+      def initialize(token: DEFAULTS[:token], scheme: "Bearer")
         super()
-        @token  = Strategy.required!(:token, token)
+        @token  = required!(:token, token)
         @scheme = scheme
       end
 

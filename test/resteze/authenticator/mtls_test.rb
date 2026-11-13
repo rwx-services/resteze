@@ -9,9 +9,17 @@ module Resteze
       after do
         AuthApi.authenticator = nil
         Thread.current[CONNECTION_KEY] = nil
-        %i[client_cert client_key client_key_passphrase].each do |setting|
+        %i[client_cert client_key client_key_passphrase ca_file].each do |setting|
           AuthApi.public_send(:"#{setting}=", nil) if AuthApi.respond_to?(:"#{setting}=")
         end
+      end
+
+      def configure_pem!
+        cert, key = self_signed
+        Class.new(AuthApi::Authenticator) { strategy :mtls }
+        AuthApi.client_cert = cert.to_pem
+        AuthApi.client_key  = key.to_pem
+        [cert, key]
       end
 
       def self_signed
@@ -32,17 +40,16 @@ module Resteze
         end
       end
 
-      it "is registered as :mtls and expects client_cert, client_key and client_key_passphrase" do
+      it "is registered as :mtls, requires client_cert and client_key, and optionally reads the passphrase and ca_file" do
         assert_equal Mtls, Strategy.lookup(:mtls)
-        assert_equal %i[client_cert client_key client_key_passphrase], Mtls.settings
-        assert_equal %i[client_key_passphrase], Mtls.new(cert: "a.pem", key: "b.pem").settings
+        assert_equal %i[client_cert client_key client_key_passphrase ca_file], Mtls.settings
+        assert_equal %i[client_cert client_key], Mtls.required_settings
+        assert_equal %i[client_key_passphrase ca_file], Mtls.new(cert: "a.pem", key: "b.pem").settings
+        assert_empty Mtls.new(cert: "a.pem", key: "b.pem").required_settings
       end
 
       it "builds the connection from PEM in the module's settings, alongside another scheme" do
-        cert, key = self_signed
-        Class.new(AuthApi::Authenticator) { strategy :mtls }
-        AuthApi.client_cert = cert.to_pem
-        AuthApi.client_key  = key.to_pem
+        cert, key = configure_pem!
         AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new(ca_file: "/tmp/ca.pem"), ApiKey.new])
         Thread.current[CONNECTION_KEY] = nil
 
@@ -52,6 +59,28 @@ module Resteze
         assert_equal key.to_pem,  ssl.client_key.to_pem
         assert_equal "/tmp/ca.pem", ssl.ca_file
         assert ssl.verify
+      end
+
+      it "reads the CA bundle from the module's ca_file setting and reports nothing missing without a passphrase" do
+        configure_pem!
+        AuthApi.ca_file = "/tmp/bundle.pem"
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new])
+
+        assert_equal "/tmp/bundle.pem", AuthApi.authenticator.connection_options[:ssl][:ca_file]
+        assert_nil AuthApi.client_key_passphrase
+        assert_empty AuthApi.authenticator.missing_settings
+      end
+
+      it "logs a warning whenever a connection is built with verify: false" do
+        configure_pem!
+        log = StringIO.new
+        AuthApi.logger = Logger.new(log)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new(verify: false)])
+
+        refute AuthApi.authenticator.connection_options[:ssl][:verify]
+        assert_match(/AuthApi uses mTLS with verify: false/, log.string)
+      ensure
+        AuthApi.logger = Logger.new(nil)
       end
 
       it "reads certificates from files and decrypts a passphrase-protected key" do
@@ -82,13 +111,13 @@ module Resteze
 
       it "names the missing setting when the connection is built, and rejects nil options" do
         Class.new(AuthApi::Authenticator) { strategy :mtls }
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Mtls.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Mtls.new])
         Thread.current[CONNECTION_KEY] = nil
 
         error = assert_raises(ArgumentError) { AuthApi::Client.default_connection }
 
         assert_match(/AuthApi\.client_cert is not set; the mtls authentication strategy needs it/, error.message)
-        assert_equal %i[client_cert client_key client_key_passphrase], AuthApi.authenticator.missing_settings
+        assert_equal %i[client_cert client_key], AuthApi.authenticator.missing_settings
         assert_raises(ArgumentError) { Mtls.new(cert: nil, key: "k") }
       end
     end

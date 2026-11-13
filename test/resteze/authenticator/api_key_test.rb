@@ -20,7 +20,7 @@ module Resteze
       end
 
       it "sends the module's api_key in X-Api-Key by default" do
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: ApiKey.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [ApiKey.new])
         stub_request(:get, URL).with(headers: { "X-Api-Key" => "secret-key" }).to_return(body: '{"id":1}')
 
         assert_equal 1, AuthApi::Widget.retrieve(1).id
@@ -43,7 +43,7 @@ module Resteze
       end
 
       it "puts a query key in the query string even for a POST with a body" do
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: ApiKey.new(query: "api_key"))
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [ApiKey.new(query: "api_key")])
         stub_request(:post, "http://auth.example.com/widgets")
           .with(query: { "api_key" => "secret-key" }, body: { name: "x" })
           .to_return(body: '{"id":2,"name":"x"}')
@@ -61,7 +61,7 @@ module Resteze
 
       it "names the missing setting" do
         AuthApi.api_key = nil
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: ApiKey.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [ApiKey.new])
 
         error = assert_raises(ArgumentError) { AuthApi::Widget.retrieve(1) }
 

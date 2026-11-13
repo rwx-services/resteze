@@ -21,8 +21,8 @@ module Resteze
   #     renewed; `attempt` counts failures so far, starting at 1.
   #
   # A scheme is chosen with `authenticate_with` on the module (or `strategy`
-  # inside this class), by the name a built-in registered in
-  # Strategy::BUILT_IN or by a Strategy subclass; several may be combined.
+  # inside this class), by the name a built-in registered through
+  # Strategy.register or by a Strategy subclass; several may be combined.
   # Each scheme expects its credential in a module setting named by its
   # DEFAULTS, which an initializer fills through `configure`, and declaring
   # the scheme declares the setting:
@@ -108,9 +108,9 @@ module Resteze
 
     attr_reader :strategies
 
-    def initialize(strategies: self.class.strategy_instances, strategy: nil)
+    def initialize(strategies: self.class.strategy_instances)
       initialize_state
-      @strategies = Array(strategy || strategies).freeze
+      @strategies = Array(strategies).freeze
       self.api_module = self.class.api_module
     end
 
@@ -130,11 +130,13 @@ module Resteze
       strategies.flat_map(&:settings).uniq
     end
 
-    # Those settings that are still nil, for checking configuration at boot:
+    # Those settings the strategies cannot work without that are still nil,
+    # for checking configuration at boot (a strategy's OPTIONAL settings,
+    # such as a key passphrase, are not reported):
     #
     #   raise "MyApi needs #{MyApi.authenticator.missing_settings.join(', ')}" if MyApi.authenticator.missing_settings.any?
     def missing_settings
-      settings.reject { |name| api_module.respond_to?(name) && !api_module.public_send(name).nil? }
+      strategies.flat_map(&:required_settings).uniq.select { |name| api_module.try(name).nil? }
     end
 
     # Faraday connection options merged from every strategy, such as `ssl:`.

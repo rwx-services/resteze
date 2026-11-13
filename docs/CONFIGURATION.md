@@ -109,9 +109,9 @@ The convention is a default. Any credential option also takes a Symbol naming a 
 | `:api_key` | `api_key` | `value:`, and `header:` (default `X-Api-Key`) or `query:` | the key in that header, or in the query string on every request whatever the method |
 | `:basic` | `username`, `password` | `username:`, `password:` | `Authorization: Basic …` |
 | `:bearer` | `api_key` | `token:`, `scheme:` (default `Bearer`) | `Authorization: Bearer …`; `scheme: 'Token'` for another prefix |
-| `:mtls` | `client_cert`, `client_key`, `client_key_passphrase` | `cert:`, `key:`, `passphrase:`, `ca_file:`, `verify:` | a client certificate on the TLS connection; nothing on the requests |
+| `:mtls` | `client_cert`, `client_key`; optionally `client_key_passphrase`, `ca_file` | `cert:`, `key:`, `passphrase:`, `ca_file:`, `verify:` | a client certificate on the TLS connection; nothing on the requests |
 
-`cert:` and `key:` for `:mtls` are PEM strings or paths to PEM files, from the settings, a callable, or a literal. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself.
+`cert:` and `key:` for `:mtls` are PEM strings or paths to PEM files, from the settings, a callable, or a literal. A path is read as given when the connection is first built, so make it absolute (`Rails.root.join(...)`); a relative path resolves against whatever the process's working directory happens to be at that moment. The certificate is applied when `Client.default_connection` builds the connection, so an override of that method must pass `connection_options` to Faraday itself. `missing_settings` leaves a scheme's optional settings alone, so an unencrypted key with no passphrase is not reported as missing. `verify: false` logs a warning through the module's logger every time a connection is built with it.
 
 ### The lifecycle
 
@@ -119,7 +119,7 @@ The client calls the authenticator at three points: `connection_options` when th
 
 ### Writing a scheme
 
-Subclass `Resteze::Authenticator::Strategy` and implement `apply(request, state)`; add `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings. `resolve` reads an option whether it is a Symbol (from the module), a callable, or a literal; `resolve!` does the same and raises a clear `ArgumentError` on `nil`. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
+Subclass `Resteze::Authenticator::Strategy` and implement `apply(request, state)`; add `connection_options` or `refresh?(error, attempt, state)` when needed. A `DEFAULTS` constant whose Symbol values name module settings makes `authenticate_with` declare those settings; list in `OPTIONAL` any the scheme works without, and `missing_settings` will not report them. `resolve` reads an option whether it is a Symbol (from the module), a callable, or a literal; `resolve!` does the same and raises a clear `ArgumentError` on `nil`; `required!(name, value)` in a constructor rejects `nil` for an option that must be given. `state` is a hash shared by every thread and every strategy on the authenticator, already under its lock, so a cached credential needs no synchronisation of its own; prefix your keys with the scheme's name. Options after the class go to your constructor.
 
 ```ruby
 module MyApi

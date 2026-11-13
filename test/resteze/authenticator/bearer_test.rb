@@ -20,7 +20,7 @@ module Resteze
       end
 
       it "sends the module's api_key as a bearer token" do
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Bearer.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Bearer.new])
         stub_request(:get, URL).with(headers: { "Authorization" => "Bearer secret-key" }).to_return(body: '{"id":1}')
 
         assert_equal 1, AuthApi::Widget.retrieve(1).id
@@ -28,7 +28,8 @@ module Resteze
 
       it "takes another scheme prefix, another setting, a callable or a literal" do
         tokens = %w[first second]
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Bearer.new(token: -> { tokens.shift }, scheme: "Token"))
+        bearer = Bearer.new(token: -> { tokens.shift }, scheme: "Token")
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [bearer])
         stub_request(:get, URL).to_return(body: "{}")
 
         2.times { AuthApi::Client.new.execute_request(:get, "/widgets/1") }
@@ -50,7 +51,7 @@ module Resteze
 
       it "names the missing setting and rejects a nil token" do
         AuthApi.api_key = nil
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: Bearer.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Bearer.new])
 
         error = assert_raises(ArgumentError) { AuthApi::Widget.retrieve(1) }
 
