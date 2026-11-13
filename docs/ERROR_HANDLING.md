@@ -314,7 +314,7 @@ user = RetryableRequest.execute { MyApi::User.retrieve('123') }
 
 ## Errors Reported in a 2xx Body
 
-Some APIs answer with a successful HTTP status and put the failure in the body. Braze, for example, returns `201 Created` with `{"message": "success", "errors": [...]}` when some records in a batch were rejected, and `200 OK` with `{"message": "Invalid API key"}` for others. The status-based middleware cannot see these.
+Some APIs answer with a successful HTTP status and put the failure in the body. A messaging API might return `201 Created` with `{"message": "success", "errors": [...]}` when some records in a batch were rejected, and `200 OK` with `{"message": "Invalid API key"}` for others. The status-based middleware cannot see these.
 
 Override `body_error` on your module's `Response`. It receives the parsed `Response` after the middleware has accepted the status. Return an exception to raise it, or `nil` to accept the response. `Error.from_response` builds a namespaced error that carries the status, headers, body and parsed `json_body`, with the `Response` itself as `e.response`:
 
