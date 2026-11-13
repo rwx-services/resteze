@@ -170,33 +170,39 @@ BodyApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
-# A scheme defined the way a built-in is: a Strategy subclass whose
-# DEFAULTS name the module setting it expects.
-class HeaderKey < Resteze::Authenticator::Strategy
-  DEFAULTS = { value: :api_key }.freeze
+# A scheme no built-in covers, written the way a client would write one: a
+# Strategy subclass whose DEFAULTS name the module setting it expects. It
+# signs the request's method and path with a shared secret.
+class HmacSignature < Resteze::Authenticator::Strategy
+  DEFAULTS = { secret: :signing_secret }.freeze
 
   attr_reader :header
 
-  def initialize(value: :api_key, header: "X-Api-Key")
+  def self.sign(secret, request)
+    OpenSSL::HMAC.hexdigest("SHA256", secret.to_s, "#{request.http_method.to_s.upcase} #{request.path}")
+  end
+
+  def initialize(secret: DEFAULTS[:secret], header: "X-Signature")
     super()
-    @value  = Resteze::Authenticator::Strategy.required!(:value, value)
+    @secret = required!(:secret, secret)
     @header = header
   end
 
   def credential_options
-    { value: @value }
+    { secret: @secret }
   end
 
   def apply(request, _state)
-    request.headers[header] = resolve!(:value, @value).to_s
+    request.headers[header] = self.class.sign(resolve!(:secret, @secret), request)
   end
 end
 
-# An API authenticated with a header key read from AuthApi.api_key.
+# An API authenticated with the built-in :api_key scheme, read from
+# AuthApi.api_key.
 module AuthApi
   include Resteze
 
-  authenticate_with HeaderKey # expects AuthApi.api_key
+  authenticate_with :api_key # expects AuthApi.api_key
 
   class Widget < ApiResource
     include Save
@@ -212,12 +218,13 @@ AuthApi.configure do |config|
   config.logger   = Logger.new(nil)
 end
 
-# Configured entirely through the module-level macros.
+# Configured entirely through the module-level macros, combining a built-in
+# scheme with a custom one.
 module MacroApi
   include Resteze
 
-  authenticate_with HeaderKey, value: "k"
-  authenticate_with HeaderKey, header: "X-Second", value: :second_key
+  authenticate_with :api_key, value: "k"
+  authenticate_with HmacSignature, header: "X-Second", secret: :second_key
   rate_limit_with :token_bucket, capacity: 5, refill_rate: 1
 end
 

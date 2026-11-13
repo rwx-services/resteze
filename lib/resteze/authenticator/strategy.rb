@@ -20,6 +20,11 @@ module Resteze
       # Option defaults; Symbol values are settings read from the module.
       DEFAULTS = {}.freeze
 
+      # Options the scheme works without (a passphrase for a key that is
+      # not encrypted). Their settings are declared on the module like any
+      # other but never reported by `missing_settings`.
+      OPTIONAL = [].freeze
+
       attr_accessor :api_module
 
       # Names a scheme for `authenticate_with :name`. Each built-in registers
@@ -43,16 +48,19 @@ module Resteze
         self::DEFAULTS.merge(options).values.grep(Symbol)
       end
 
-      def self.required!(name, value)
-        raise ArgumentError, "#{name}: is required" if value.nil?
-
-        value
+      # Those of them the scheme cannot work without.
+      def self.required_settings(options = {})
+        self::DEFAULTS.merge(options).except(*self::OPTIONAL).values.grep(Symbol)
       end
 
       # The module settings this instance reads: DEFAULTS as overridden by
       # the credential options it was built with.
       def settings
         self.class.settings(credential_options)
+      end
+
+      def required_settings
+        self.class.required_settings(credential_options)
       end
 
       # The credential options as given to the constructor, so `settings`
@@ -79,14 +87,21 @@ module Resteze
 
       private
 
-      # A Symbol reads the named setting from the module (nil when the
-      # module has no such setting), a callable is called, anything else is
-      # used as is.
+      # For constructors: rejects nil for an option the scheme needs.
+      def required!(name, value)
+        raise ArgumentError, "#{name}: is required" if value.nil?
+
+        value
+      end
+
+      # A Symbol reads the named setting from the module (nil when there is
+      # no module or no such setting), a callable is called, anything else
+      # is used as is.
       def resolve(value)
         return value.call if value.respond_to?(:call)
         return value unless value.is_a?(Symbol)
 
-        api_module.respond_to?(value) ? api_module.public_send(value) : nil
+        api_module.try(value)
       end
 
       # As `resolve`, but a nil result is a configuration error that names
@@ -95,8 +110,9 @@ module Resteze
         resolved = resolve(value)
         return resolved unless resolved.nil?
 
-        where = value.is_a?(Symbol) ? "#{api_module || 'the API module'}.#{value} is not set" : "#{option}: resolved to nil"
-        raise ArgumentError, "#{where}; the #{self.class.name.demodulize.underscore} authentication strategy needs it"
+        where  = value.is_a?(Symbol) ? "#{api_module || 'the API module'}.#{value} is not set" : "#{option}: resolved to nil"
+        scheme = self.class.name&.demodulize&.underscore || "custom"
+        raise ArgumentError, "#{where}; the #{scheme} authentication strategy needs it"
       end
     end
   end

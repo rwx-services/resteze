@@ -40,22 +40,22 @@ module Resteze
 
     describe "the module-level macros" do
       it "configure the module's Authenticator and RateLimiter without opening them" do
-        assert_equal [HeaderKey, HeaderKey], MacroApi::Authenticator.strategy.map(&:first)
+        assert_equal [Authenticator::ApiKey, HmacSignature], MacroApi::Authenticator.strategy.map(&:first)
         assert_equal 2, MacroApi.authenticator.strategies.size
         assert_kind_of Resteze::RateLimiter::TokenBucket, MacroApi.rate_limiter.strategy
         assert_in_delta 5.0, MacroApi.rate_limiter.strategy.capacity
       end
 
-      it "apply through the client like the class form" do
+      it "apply a built-in and a custom scheme together through the client" do
         MacroApi.second_key = "s"
         req = MacroApi.authenticator.apply(request)
 
         assert_equal "k", req.headers["X-Api-Key"]
-        assert_equal "s", req.headers["X-Second"]
+        assert_equal HmacSignature.sign("s", req), req.headers["X-Second"]
       end
 
       it "refuse to run on Resteze itself or on a module that has not included it" do
-        assert_raises(ArgumentError) { Resteze.authenticate_with(HeaderKey) }
+        assert_raises(ArgumentError) { Resteze.authenticate_with(HmacSignature) }
         assert_raises(ArgumentError) do
           Module.new.extend(Resteze::ClassMethods).rate_limit_with(:token_bucket, capacity: 1, refill_rate: 1)
         end
@@ -65,35 +65,35 @@ module Resteze
     describe "the strategy macro" do
       it "configures one or several strategies, inherited by subclasses" do
         klass = Class.new(Resteze::Authenticator) do
-          strategy HeaderKey, value: "k"
-          strategy HeaderKey, header: "X-Other", value: "o"
+          strategy HmacSignature, secret: "k"
+          strategy HmacSignature, header: "X-Other", secret: "o"
         end
 
-        assert_equal [HeaderKey, HeaderKey], klass.strategy.map(&:first)
+        assert_equal [HmacSignature, HmacSignature], klass.strategy.map(&:first)
         assert_equal klass.strategy, Class.new(klass).strategy
         assert_equal 2, klass.new.strategies.size
 
         req = Class.new(klass).new.apply(request)
 
-        assert_equal "k", req.headers["X-Api-Key"]
-        assert_equal "o", req.headers["X-Other"]
+        assert_equal HmacSignature.sign("k", req), req.headers["X-Signature"]
+        assert_equal HmacSignature.sign("o", req), req.headers["X-Other"]
       end
 
       it "rejects unknown names, options without a name, and a nil required option" do
         assert_raises(ArgumentError) { Class.new(Resteze::Authenticator) { strategy :unknown_scheme, value: "x" } }
         assert_raises(ArgumentError) { Class.new(Resteze::Authenticator) { strategy(header: "X") } }
-        assert_raises(ArgumentError) { HeaderKey.new(value: nil) }
+        assert_raises(ArgumentError) { HmacSignature.new(secret: nil) }
       end
 
       it "resolves a registered name to its class" do
-        Authenticator::Strategy.register(:header_key, HeaderKey)
+        Authenticator::Strategy.register(:hmac, HmacSignature)
 
-        klass = Class.new(Resteze::Authenticator) { strategy :header_key, value: "k" }
+        klass = Class.new(Resteze::Authenticator) { strategy :hmac, secret: "k" }
 
-        assert_equal HeaderKey, Authenticator::Strategy.lookup("header_key")
-        assert_equal [HeaderKey, { value: "k" }], klass.strategy.first
+        assert_equal HmacSignature, Authenticator::Strategy.lookup("hmac")
+        assert_equal [HmacSignature, { secret: "k" }], klass.strategy.first
       ensure
-        Authenticator::Strategy.registry.delete(:header_key)
+        Authenticator::Strategy.registry.delete(:hmac)
       end
 
       it "keeps state across calls for a strategy that uses it" do
@@ -122,10 +122,22 @@ module Resteze
       end
 
       it "reports a strategy's settings from its DEFAULTS and options" do
-        assert_equal %i[api_key],     HeaderKey.settings
-        assert_equal %i[partner_key], HeaderKey.settings(value: :partner_key)
-        assert_empty HeaderKey.settings(value: -> { "k" })
+        assert_equal %i[signing_secret], HmacSignature.settings
+        assert_equal %i[partner_secret], HmacSignature.settings(secret: :partner_secret)
+        assert_empty HmacSignature.settings(secret: -> { "k" })
         assert_empty Authenticator::Strategy.settings
+      end
+
+      it "leaves a scheme's OPTIONAL settings out of the required ones" do
+        with_optional = Class.new(Authenticator::Strategy) do
+          const_set(:DEFAULTS, { token: :api_token, realm: :realm }.freeze)
+          const_set(:OPTIONAL, %i[realm].freeze)
+        end
+
+        assert_equal %i[api_token realm], with_optional.settings
+        assert_equal %i[api_token],       with_optional.required_settings
+        assert_equal %i[api_token],       with_optional.new.required_settings
+        assert_equal %i[other],           with_optional.required_settings(token: :other)
       end
 
       it "reports an instance's settings from DEFAULTS when a scheme declares no credential options" do
@@ -151,7 +163,7 @@ module Resteze
 
         error = assert_raises(ArgumentError) { AuthApi::Widget.retrieve(1) }
 
-        assert_match(/AuthApi\.api_key is not set; the header_key authentication strategy needs it/, error.message)
+        assert_match(/AuthApi\.api_key is not set; the api_key authentication strategy needs it/, error.message)
         assert_equal %i[api_key], AuthApi.authenticator.missing_settings
       ensure
         AuthApi.api_key = "secret-key"
@@ -160,21 +172,21 @@ module Resteze
       end
 
       it "accepts a callable or a literal in place of a setting name" do
-        authenticator = AuthApi::Authenticator.new(strategies: [HeaderKey.new(value: -> { "called" }),
-                                                                HeaderKey.new(header: "X-Lit", value: "literal")])
+        authenticator = AuthApi::Authenticator.new(strategies: [HmacSignature.new(secret: -> { "called" }),
+                                                                HmacSignature.new(header: "X-Lit", secret: "literal")])
         req = authenticator.apply(request)
 
-        assert_equal "called",  req.headers["X-Api-Key"]
-        assert_equal "literal", req.headers["X-Lit"]
+        assert_equal HmacSignature.sign("called", req),  req.headers["X-Signature"]
+        assert_equal HmacSignature.sign("literal", req), req.headers["X-Lit"]
         assert_empty authenticator.settings
 
-        error = assert_raises(ArgumentError) { HeaderKey.new(value: -> {}).apply(request, {}) }
+        error = assert_raises(ArgumentError) { HmacSignature.new(secret: -> {}).apply(request, {}) }
 
-        assert_match(/value: resolved to nil/, error.message)
+        assert_match(/secret: resolved to nil/, error.message)
       end
 
       it "reads settings from the module a replacement authenticator is assigned to" do
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: HeaderKey.new(header: "X-Replaced"))
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [Authenticator::ApiKey.new(header: "X-Replaced")])
         stub_request(:get, URL).to_return(body: "{}")
 
         AuthApi::Client.new.execute_request(:get, "/widgets/1")
@@ -185,9 +197,23 @@ module Resteze
       end
 
       it "says so when a bare strategy has no module to read from" do
-        error = assert_raises(ArgumentError) { HeaderKey.new.apply(request, {}) }
+        error = assert_raises(ArgumentError) { HmacSignature.new.apply(request, {}) }
 
-        assert_match(/the API module\.api_key is not set/, error.message)
+        assert_match(/the API module\.signing_secret is not set/, error.message)
+      end
+
+      it "still names the setting for a strategy class with no name" do
+        anonymous = Class.new(Authenticator::Strategy) do
+          const_set(:DEFAULTS, { token: :api_token }.freeze)
+
+          def apply(request, _state)
+            request.headers["X-Token"] = resolve!(:token, :api_token)
+          end
+        end
+
+        error = assert_raises(ArgumentError) { anonymous.new.apply(request, {}) }
+
+        assert_match(/the API module\.api_token is not set; the custom authentication strategy needs it/, error.message)
       end
     end
 
@@ -204,7 +230,7 @@ module Resteze
             request.query["api_key"] = "k"
           end
         end
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: query_key.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [query_key.new])
         stub_request(:post, "http://auth.example.com/widgets").with(query: { "api_key" => "k" }, body: { name: "x" })
                                                               .to_return(body: '{"id":2,"name":"x"}')
 
@@ -212,6 +238,41 @@ module Resteze
         widget.save
 
         assert_equal 2, widget.id
+      end
+
+      it "sends a resource placed in request.query as its id" do
+        by_widget = Class.new(Authenticator::Strategy) do
+          def apply(request, _state)
+            request.query[:widget] = AuthApi::Widget.construct_from(id: 7)
+          end
+        end
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [by_widget.new])
+        stub_request(:get, URL).with(query: { "widget" => "7" }).to_return(body: '{"id":1}')
+
+        assert_equal 1, AuthApi::Widget.retrieve(1).id
+      end
+
+      it "hands the strategies copies, so the caller's hashes are untouched" do
+        tagging = Class.new(Authenticator::Strategy) do
+          def apply(request, _state)
+            request.headers["X-Tag"] = "t"
+            request.params[:tag]     = "t"
+            request.query[:tag]      = "t"
+          end
+        end
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [tagging.new])
+        stub_request(:post, "http://auth.example.com/widgets").with(query: { tag: "t" }).to_return(body: "{}")
+        headers = {}
+        params  = { name: "x" }
+        query   = {}
+
+        AuthApi::Client.new.execute_request(:post, "/widgets", headers:, params:, query:)
+
+        assert_requested(:post, "http://auth.example.com/widgets", query: { "tag" => "t" }, headers: { "X-Tag" => "t" },
+                                                                   body: { name: "x", tag: "t" })
+        assert_empty headers
+        assert_equal({ name: "x" }, params)
+        assert_empty query
       end
 
       it "retries once with a renewed credential when a strategy says so" do
@@ -227,7 +288,7 @@ module Resteze
             true
           end
         end
-        AuthApi.authenticator = Resteze::Authenticator.new(strategy: renewing.new)
+        AuthApi.authenticator = Resteze::Authenticator.new(strategies: [renewing.new])
         stub_request(:get, URL).with(headers: { "Authorization" => "Bearer stale" }).to_return(status: 401)
         stub_request(:get, URL).with(headers: { "Authorization" => "Bearer fresh" }).to_return(body: '{"id":1}')
 

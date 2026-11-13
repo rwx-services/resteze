@@ -13,13 +13,13 @@ module Resteze
 
       attr_reader :header, :query
 
-      def initialize(value: :api_key, header: nil, query: nil)
+      def initialize(value: DEFAULTS[:value], header: nil, query: nil)
         super()
         raise ArgumentError, "api_key takes header: or query:, not both" if header && query
 
-        @value  = Strategy.required!(:value, value)
+        @value  = required!(:value, value)
         @query  = query
-        @header = query ? nil : (header || "X-Api-Key")
+        @header = header || ("X-Api-Key" unless query)
       end
 
       def credential_options

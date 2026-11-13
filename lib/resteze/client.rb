@@ -119,7 +119,7 @@ module Resteze
 
     private
 
-    def process_params(method, params, query = {})
+    def process_params(method, params, query)
       body = nil
       query_params = nil
       case method.to_s.downcase.to_sym
@@ -128,7 +128,7 @@ module Resteze
       else
         body = params.to_json
       end
-      query_params = (query_params || {}).merge(query) if query.present?
+      query_params = (query_params || {}).merge(util.objects_to_ids(query)) if query.present?
       [body, query_params]
     end
 

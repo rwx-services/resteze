@@ -9,10 +9,10 @@ module Resteze
     class Basic < Strategy
       DEFAULTS = { username: :username, password: :password }.freeze
 
-      def initialize(username: :username, password: :password)
+      def initialize(username: DEFAULTS[:username], password: DEFAULTS[:password])
         super()
-        @username = Strategy.required!(:username, username)
-        @password = Strategy.required!(:password, password)
+        @username = required!(:username, username)
+        @password = required!(:password, password)
       end
 
       def credential_options
