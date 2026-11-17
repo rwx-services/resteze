@@ -120,6 +120,56 @@ WrapApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
+# An API with nested resources: items live under /catalogs/:catalog_name.
+module NestApi
+  include Resteze
+
+  class Catalog < ApiResource
+    property :name
+
+    def items(params: {}) = Item.list(catalog_name: name, parent: self, params:)
+  end
+
+  class Item < ApiResource
+    include List
+    include Save
+    include Destroy
+
+    property :id
+    property :price
+
+    path_template "catalogs/:catalog_name/items"
+
+    action :archive,     method: :post, on: :member
+    action :move,        method: :post, on: :member
+    action :lookup,      method: :get,  on: :member, id: :param
+    action :duplicate,   method: :post, on: :member, returns: :self
+    action :bulk_update, method: :post
+    action :search,      method: :get, returns: :list
+  end
+
+  class SaleItem < Item; end
+
+  # The API echoes the parent's name in each field's body.
+  class Field < ApiResource
+    property :id
+    property :catalog_name
+
+    path_template "catalogs/:catalog_name/fields"
+  end
+
+  class Variant < ApiResource
+    property :id
+
+    path_template "catalogs/:catalog_name/items/:item_id/variants"
+  end
+end
+
+NestApi.configure do |config|
+  config.api_base = "http://nest.example.com/"
+  config.logger = Logger.new(nil)
+end
+
 # An API that reports failures inside a 2xx body:
 # { "message": "success" } or { "message": "...", "errors": [...] }.
 module BodyApi

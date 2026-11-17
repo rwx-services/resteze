@@ -2,11 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.0.1]
 
 ### Added
 
+- `path_template` on `ApiResource` for nested resources: `path_template "catalogs/:catalog_name/items"` routes `retrieve`, `list`, `save`, `destroy`, `refresh` and every action under the filled template. Class methods take the tokens as keywords (`Item.list(catalog_name: "shoes")`), instances remember them (`item.catalog_name`, `item.path_params`), `Item.nested?` says whether a resource has a template, and a missing value, or a `.` / `..` one, raises `InvalidRequestError` naming it. See `docs/NESTED_RESOURCES.md`.
+- `parent:` keyword on a templated resource's `list`, `retrieve`, `new` and action methods: a plain reference handed to every object the call builds, readable as `item.parent`.
+- `has_action ... path:` fills a nested resource's tokens with their upcased names (`/catalogs/CATALOG_NAME/items/ID`).
 - `destroy` built-in action (DELETE, member, id in the path) and the opt-in `Destroy` mixin, which adds `#destroy` and `.destroy(id)` returning a `Result` via `process_destroy_response`.
+
+### Changed
+
+- `resource_path`, `Action#path_for`, `list`, `list_resource_path`, `retrieve`, `invoke_action` and `ApiResource#initialize` accept path values. Resources without a `path_template` behave as before, including overrides of these methods with their 1.0.0 signatures.
+- Ids, action path segments and path values are percent-encoded for a URL path (`ERB::Util.url_encode`) rather than form-encoded (`CGI.escape`). The visible difference is a space, which is now sent as `%20`: it was sent as `+`, which a server reads as a literal plus sign in a path.
+- `retrieve` with no arguments now raises `InvalidRequestError` (invalid ID) rather than `ArgumentError`.
+
+### Fixed
+
+- `require "resteze/testing/rspec"` raised `NameError` (`Resteze::Testing::RSpec::Matchers`), so the RSpec helpers could not be loaded. They load now and have their own tests.
 
 ## [1.0.0]
 

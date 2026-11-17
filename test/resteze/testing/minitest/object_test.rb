@@ -38,6 +38,16 @@ module Resteze
         end
       end
 
+      describe "has_action on a nested resource" do
+        subject { NestApi::Item }
+
+        it "fills path_template tokens with their upcased names" do
+          has_action :archive, path: "/catalogs/CATALOG_NAME/items/ID/archive"
+          has_action :bulk_update, path: "/catalogs/CATALOG_NAME/items/bulk_update"
+          has_action :retrieve, path: "/catalogs/CATALOG_NAME/items/ID"
+        end
+      end
+
       describe "has_property" do
         subject { AcmeApi::Doodad }
 

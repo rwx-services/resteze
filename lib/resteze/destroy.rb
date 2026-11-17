@@ -24,7 +24,7 @@ module Resteze
       return resource_path if destroy_action.rest_default?
 
       raise_invalid_destroy_id! if id.blank?
-      destroy_action.path_for(id)
+      destroy_action.path_for(id, routing_path_params)
     end
 
     # The id param when the :destroy action carries the id as a param rather
@@ -46,8 +46,10 @@ module Resteze
     end
 
     module ClassMethods
-      def destroy(id)
-        new(id).destroy
+      # Keywords are path context, accepted only by a class that declares a
+      # path_template: its tokens, and parent:.
+      def destroy(id, **path_context)
+        new(id).assign_path_context(*path_context!(path_context)).destroy
       end
     end
 

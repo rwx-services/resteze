@@ -21,9 +21,9 @@ module Resteze
     def save_resource_path
       action = save_action
       if action.rest_default?
-        persisted? ? resource_path : self.class.resource_path
+        persisted? ? resource_path : self.class.resource_path(**routing_path_params)
       else
-        persisted? ? action.path_for(id) : action.path_for
+        action.path_for((id if persisted?), routing_path_params)
       end
     end
 

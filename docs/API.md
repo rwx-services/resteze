@@ -120,29 +120,27 @@ end
 
 ### Nested Resources
 
+A resource that lives under a parent declares its path with `path_template`.
+Each `:token` is filled per call and remembered by the instance:
+
 ```ruby
 module MyApi
   class Comment < ApiResource
+    include MyApi::List
+
     property :id
-    property :post_id
     property :content
     property :author
-    
-    def self.resource_path(id = nil, post_id: nil)
-      if post_id
-        "/posts/#{post_id}/comments#{id ? "/#{id}" : ""}"
-      else
-        super(id)
-      end
-    end
-    
-    # Retrieve comments for a specific post
-    def self.list_by_post(post_id)
-      request(:get, resource_path(nil, post_id: post_id))
-    end
+
+    path_template "posts/:post_id/comments"
   end
 end
+
+MyApi::Comment.list(post_id: 42)           # GET /posts/42/comments
+MyApi::Comment.retrieve(7, post_id: 42)    # GET /posts/42/comments/7
 ```
+
+See [NESTED_RESOURCES.md](NESTED_RESOURCES.md).
 
 ## Making Requests
 

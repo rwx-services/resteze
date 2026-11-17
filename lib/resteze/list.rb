@@ -4,9 +4,12 @@ module Resteze
     include ApiModule
 
     module ClassMethods
-      def list(params: {})
-        resp = request(list_method, list_resource_path(params), params: list_params(params))
-        construct_list_from(resp.data)
+      # Keywords other than params: are path context, accepted only by a
+      # class that declares a path_template.
+      def list(params: {}, **path_context)
+        path_params, parent = path_context!(path_context)
+        resp = request(list_method, list_resource_path(params, **path_params), params: list_params(params))
+        apply_path_context(construct_list_from(resp.data), path_params, parent)
       end
 
       def construct_list_from(payload)
@@ -27,8 +30,8 @@ module Resteze
         {}
       end
 
-      def list_resource_path(_params = {})
-        action_for(:list).path_for
+      def list_resource_path(_params = {}, **path_params)
+        action_for(:list).path_for(nil, path_params)
       end
 
       def list_key

@@ -182,6 +182,13 @@ class CampaignTest < Minitest::Spec
 end
 ```
 
+For a nested resource (one that declares a `path_template`), each token is
+filled with its upcased name:
+
+```ruby
+has_action :archive, path: "/catalogs/CATALOG_NAME/items/ID/archive"
+```
+
 ### Testing Lists
 
 ```ruby

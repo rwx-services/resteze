@@ -247,7 +247,7 @@ class User < ApiResource
   action :track, method: :post
 end
 
-result = MyApi::User.track(events: [...])
+result = MyApi::User.track(events: [{ name: "signup" }])
 result.message                    # => "success"
 result.events_processed           # => 2
 result.http_response.http_status  # => 200
@@ -347,6 +347,16 @@ describe MyApi::Campaign do
   end
 end
 ```
+
+For a resource with a `path_template`, each token is filled with its upcased
+name: `"/catalogs/CATALOG_NAME/items/ID/archive"`.
+
+## Nested resources
+
+A resource that declares a `path_template` routes all of its actions under the
+filled template. The class forms of generated methods take the template's
+tokens as keywords; the instance form uses the values the instance remembers.
+See [NESTED_RESOURCES.md](NESTED_RESOURCES.md).
 
 ## The escape hatch
 

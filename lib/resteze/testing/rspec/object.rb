@@ -2,7 +2,8 @@ module Resteze
   module Testing
     module RSpec
       module Object
-        extend RSpec::Matchers
+        # ::RSpec, since a bare RSpec here is Resteze::Testing::RSpec.
+        extend ::RSpec::Matchers
 
         ACTION_READERS = { method: :http_method, on: :on, id: :id, id_param: :id_param,
                            returns: :returns, as: :generated_name }.freeze
@@ -52,7 +53,8 @@ module Resteze
         end
 
         def assert_action_path(action, path)
-          actual = action.member? ? action.path_for("ID") : action.path_for
+          tokens = subject.path_tokens.index_with { |token| token.to_s.upcase }
+          actual = action.path_for(("ID" if action.member?), tokens)
 
           expect(actual).to eq(path), "Expected #{subject} action #{action.name} to route to #{path}"
         end
