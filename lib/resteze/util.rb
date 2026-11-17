@@ -14,6 +14,13 @@ module Resteze
         end
       end
 
+      # Encodes a value for use as one segment of a URL path. This is
+      # percent-encoding, not form encoding: a space becomes %20, where
+      # CGI.escape would write a "+" that a server reads literally in a path.
+      def encode_path_segment(value)
+        ERB::Util.url_encode(value.to_s)
+      end
+
       def normalize_headers(headers)
         headers.transform_keys { |key| capitalize_parts(key) }
       end

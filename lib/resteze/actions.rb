@@ -45,14 +45,16 @@ module Resteze
         {}
       end
 
-      def invoke_action(name, params = {}, id: nil)
+      # path_params and parent are the path context of a class that declares
+      # a path_template; they route the request and are handed to any of
+      # this class's objects in the result. Other classes are never passed
+      # them.
+      def invoke_action(name, params = {}, id: nil, path_params: {}, parent: nil)
         action = action_for(name)
         raise_invalid_action_id!(id) if action.member? && id.blank?
 
-        params = action_params(name, params)
-        params = { action.id_param => id }.merge(params) if action.member? && action.id == :param
-        response = request(action.http_method, action.path_for(id), params:, headers: action_headers(name, params))
-        build_action_result(action, response)
+        response = request_action(action, action_params(name, params), id, path_params)
+        apply_path_context(build_action_result(action, response), path_params, parent)
       end
 
       private
@@ -102,14 +104,36 @@ module Resteze
         end
       end
 
+      def request_action(action, params, id, path_params)
+        params = { action.id_param => id }.merge(params) if action.member? && action.id == :param
+        request(action.http_method, action.path_for(id, path_params), params:,
+                                                                      headers: action_headers(action.name, params))
+      end
+
       def define_action_methods(action)
+        action.member? ? define_member_action(action) : define_collection_action(action)
+      end
+
+      # The instance form routes with the instance's own path context, so
+      # every keyword is a request param; the class form takes path context
+      # from its keywords.
+      def define_member_action(action)
         name = action.name
         method_name = action.generated_name
-        if action.member?
-          define_method(method_name) { |**params| self.class.invoke_action(name, params, id:) }
-          define_singleton_method(method_name) { |id, **params| new(id).public_send(method_name, **params) }
-        else
-          define_singleton_method(method_name) { |**params| invoke_action(name, params) }
+        define_method(method_name) do |**params|
+          self.class.invoke_action(name, params, id:, **action_path_context)
+        end
+        define_singleton_method(method_name) do |id, **params|
+          path_params, parent, params = partition_path_keywords(params)
+          new(id).assign_path_context(path_params, parent).public_send(method_name, **params)
+        end
+      end
+
+      def define_collection_action(action)
+        name = action.name
+        define_singleton_method(action.generated_name) do |**params|
+          path_params, parent, params = partition_path_keywords(params)
+          invoke_action(name, params, **action_path_context(path_params, parent))
         end
       end
     end

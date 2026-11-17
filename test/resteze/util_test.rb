@@ -15,6 +15,7 @@ module Resteze
 
       it "should respond to all the same class methods as Resteze::Util" do
         assert_respond_to subject, :convert_to_object
+        assert_respond_to subject, :encode_path_segment
         assert_respond_to subject, :normalize_headers
         assert_respond_to subject, :normalize_id
         assert_respond_to subject, :objects_to_ids
@@ -112,6 +113,22 @@ module Resteze
 
       it "should return obj when none of above" do
         assert_equal "1", subject.objects_to_ids("1")
+      end
+    end
+
+    describe ".encode_path_segment" do
+      it "percent-encodes a space, where form encoding would write a plus" do
+        assert_equal "red%20shoes", subject.encode_path_segment("red shoes")
+      end
+
+      it "encodes characters that would end the segment or the path" do
+        assert_equal "a%2Fb%3Fc%23d%2Be", subject.encode_path_segment("a/b?c#d+e")
+      end
+
+      it "leaves unreserved characters alone and accepts non-strings" do
+        assert_equal "a-b_c.d~e", subject.encode_path_segment("a-b_c.d~e")
+        assert_equal "42", subject.encode_path_segment(42)
+        assert_equal "sku", subject.encode_path_segment(:sku)
       end
     end
   end

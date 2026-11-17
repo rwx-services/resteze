@@ -92,6 +92,7 @@ module Resteze
         assert_equal "/widgets/export/ids", action(:export_ids, method: :post, path: "export/ids").path_for
         assert_equal "/widgets/a%7Cb", action(:odd, method: :get, path: "a|b").path_for
         assert_equal %w[export ids], action(:export_ids, method: :post, path: "export/ids").path_segments
+        assert_equal ["by%20name"], action(:by_name, method: :get, path: "by name").path_segments
       end
 
       it "honors a resource_path override" do
