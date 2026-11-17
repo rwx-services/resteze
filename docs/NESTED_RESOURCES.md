@@ -53,6 +53,8 @@ end
 - Subclasses inherit the template and may declare their own.
 - `Item.path_template` returns the template and `Item.path_params` its token
   names, `[:catalog_name]`.
+- `Item.nested?` is true for a resource with a template and false for any
+  other. Instances answer it too (`item.nested?`).
 - `resource_slug` is unchanged (`"items"`), so defaults derived from it, such
   as the id param name, stay the same.
 

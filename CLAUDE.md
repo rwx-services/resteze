@@ -76,7 +76,7 @@ Resolution is lazy. `Klass.actions` rebuilds a frozen hash of `Resteze::Action` 
 
 ### Nested resources: `path_template`
 
-`Resteze::PathTemplate` (mixed into `ApiResource`) lets a resource declare `path_template "catalogs/:catalog_name/items"`. `resource_path(id, **path_params)` fills it and `Action#path_for(id, path_params)` passes the values through, so every built-in and custom action nests. Class methods (`list`, `retrieve`, `new`, class forms of actions) take the tokens and an optional `parent:` as keywords via `partition_path_keywords` / `path_context!`; instances hold them outside the properties (`path_params`, `path_parent`, generated readers) and objects built by a call get them through `apply_path_context`. The instance form of a member action treats every keyword as a request param. There is no association layer. See `docs/NESTED_RESOURCES.md`.
+`Resteze::PathTemplate` (mixed into `ApiResource`) lets a resource declare `path_template "catalogs/:catalog_name/items"`. `Klass.nested?` is true for such a class. `resource_path(id, **path_params)` fills it and `Action#path_for(id, path_params)` passes the values through, so every built-in and custom action nests. Class methods (`list`, `retrieve`, `new`, class forms of actions) take the tokens and an optional `parent:` as keywords via `partition_path_keywords` / `path_context!`; instances hold them outside the properties (`path_params`, `path_parent`, generated readers) and objects built by a call get them through `apply_path_context`. The instance form of a member action treats every keyword as a request param. There is no association layer. See `docs/NESTED_RESOURCES.md`.
 
 ### Testing helpers
 

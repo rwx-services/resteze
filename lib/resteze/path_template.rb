@@ -23,6 +23,10 @@ module Resteze
       routing_path_params
     end
 
+    def nested?
+      self.class.nested?
+    end
+
     # The object handed over as `parent:`, if any. Never fetched or
     # serialized. Also readable as #parent unless a property takes that name.
     def path_parent
@@ -62,7 +66,9 @@ module Resteze
         @path_template || (superclass.path_template if superclass.respond_to?(:path_template))
       end
 
-      def templated?
+      # True for a resource that lives under a parent: one that declares
+      # (or inherits) a path_template.
+      def nested?
         path_template.present?
       end
 
@@ -81,7 +87,7 @@ module Resteze
       # Splits keywords into [path values, parent, everything else]. A class
       # with no template takes no path keywords, so all of them are "else".
       def partition_path_keywords(keywords)
-        return [{}, nil, keywords] unless templated?
+        return [{}, nil, keywords] unless nested?
 
         tokens = path_params
         [keywords.slice(*tokens), keywords[:parent], keywords.except(*tokens, :parent)]
@@ -102,13 +108,13 @@ module Resteze
       end
 
       def action_path_context(path_params, parent)
-        templated? ? { path_params:, parent: } : {}
+        nested? ? { path_params:, parent: } : {}
       end
 
       # Gives objects this class built (one, or a list of them) the path
       # values and parent of the call that produced them.
       def apply_path_context(result, path_params, parent)
-        return result unless templated?
+        return result unless nested?
 
         items = result.is_a?(::Array) ? result : [result]
         items.each { |item| item.assign_path_context(path_params, parent) if item.is_a?(self) }
@@ -120,7 +126,7 @@ module Resteze
       # The escaped path segments that precede the id.
       def resource_segments(path_params)
         reject_unknown_keywords!(path_params.except(*self.path_params))
-        return [CGI.escape(resource_slug.to_s)] unless templated?
+        return [CGI.escape(resource_slug.to_s)] unless nested?
 
         path_template_segments.map do |segment|
           segment.is_a?(Symbol) ? CGI.escape(path_value!(segment, path_params[segment]).to_s) : segment

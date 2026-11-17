@@ -44,13 +44,16 @@ module Resteze
         assert_equal "catalogs/:catalog_name/items", Item.path_template
         assert_equal [:catalog_name], Item.path_params
         assert_equal %i[catalog_name item_id], NestApi::Variant.path_params
-        assert_predicate Item, :templated?
+        assert_predicate Item, :nested?
+        assert_predicate NestApi::SaleItem, :nested?
+        assert_predicate Item.new("sku1"), :nested?
       end
 
       it "is absent on a plain resource" do
         assert_nil Catalog.path_template
         assert_empty Catalog.path_params
-        refute_predicate Catalog, :templated?
+        refute_predicate Catalog, :nested?
+        refute_predicate Catalog.new, :nested?
       end
 
       it "is inherited and can be redeclared" do
