@@ -2,7 +2,8 @@ module Resteze
   module Testing
     module RSpec
       module Object
-        extend RSpec::Matchers
+        # ::RSpec, since a bare RSpec here is Resteze::Testing::RSpec.
+        extend ::RSpec::Matchers
 
         ACTION_READERS = { method: :http_method, on: :on, id: :id, id_param: :id_param,
                            returns: :returns, as: :generated_name }.freeze

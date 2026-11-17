@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
 - Ids, action path segments and path values are percent-encoded for a URL path (`ERB::Util.url_encode`) rather than form-encoded (`CGI.escape`). The visible difference is a space, which is now sent as `%20`: it was sent as `+`, which a server reads as a literal plus sign in a path.
 - `retrieve` with no arguments now raises `InvalidRequestError` (invalid ID) rather than `ArgumentError`.
 
+### Fixed
+
+- `require "resteze/testing/rspec"` raised `NameError` (`Resteze::Testing::RSpec::Matchers`), so the RSpec helpers could not be loaded. They load now and have their own tests.
+
 ## [1.0.0]
 
 The release developed as 0.5.0, renumbered: it is the first stable release, and the error hierarchy change under **Changed** breaks code written against the Faraday-derived classes.
