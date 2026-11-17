@@ -642,7 +642,7 @@ The instance is `MyApi.rate_limiter`; assign one to replace it. Each attempt of 
 The four common algorithms are built in. Pick one with `strategy` in your module's `RateLimiter`:
 
 ```ruby
-module Braze
+module CampaignApi
   class RateLimiter
     strategy :fixed_window, limit: 250_000, window: 3600, headers: true
   end
@@ -651,7 +651,7 @@ end
 
 | Strategy | Options | Behaviour |
 |---|---|---|
-| `:fixed_window` | `limit:`, `window:` seconds, `headers:`, `reset:` | At most `limit` requests per window, windows aligned to the first request. With `headers: true` the budget and window follow the API's `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers, which is how Braze and JD Power report theirs; pass a Hash to name other headers, and `reset: :seconds` when the reset header is a countdown rather than a time. `limit:` may be omitted when the API sends it, or sends only the remaining count. Syncing is conservative: within a window the lower of the local and reported remaining counts wins, since requests admitted after the server answered are not in its number yet; a reset beyond the local window starts a fresh one; non-finite or far-future resets are not trusted |
+| `:fixed_window` | `limit:`, `window:` seconds, `headers:`, `reset:` | At most `limit` requests per window, windows aligned to the first request. With `headers: true` the budget and window follow the API's `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers, which is how many APIs report theirs; pass a Hash to name other headers, and `reset: :seconds` when the reset header is a countdown rather than a time. `limit:` may be omitted when the API sends it, or sends only the remaining count. Syncing is conservative: within a window the lower of the local and reported remaining counts wins, since requests admitted after the server answered are not in its number yet; a reset beyond the local window starts a fresh one; non-finite or far-future resets are not trusted |
 | `:sliding_window` | `limit:`, `window:` seconds | At most `limit` requests in any trailing window. Exact; memory bounded by `limit` |
 | `:token_bucket` | `capacity:`, `refill_rate:` per second | Bursts up to `capacity`, then paced at the refill rate |
 | `:leaky_bucket` | `capacity:`, `leak_rate:` per second | Smooths bursts into a steady rate; a full bucket waits for room |
@@ -711,7 +711,7 @@ end
 A strategy keeps you under the limit; `retry?` and `retry_after` say what to do when the API disagrees. Override them alongside, or instead of, a strategy:
 
 ```ruby
-module Braze
+module CampaignApi
   class RateLimiter
     strategy :fixed_window, limit: 250_000, window: 3600, headers: true
 
@@ -735,7 +735,7 @@ end
 With a strategy, `before_request` waits in the calling thread by default (`on_wait: :sleep`). A background job would often rather give the thread back and reschedule itself. `on_wait: :raise` makes the limiter raise `MyApi::RateLimitError` instead of waiting, with the computed wait in `retry_after` and no `http_status`, since nothing was sent. An error raised this way never goes through `retry?`; it is a refusal, not a failed attempt.
 
 ```ruby
-module Braze
+module CampaignApi
   class RateLimiter
     strategy :fixed_window, limit: 250_000, window: 3600, headers: true, on_wait: :raise
   end
@@ -749,7 +749,7 @@ class TrackEventsJob
   end
 
   def perform(events)
-    Braze::User.track(events:)   # a spent budget, or a 429, raises; Sidekiq reschedules
+    CampaignApi::User.track(events:)   # a spent budget, or a 429, raises; Sidekiq reschedules
   end
 end
 ```
@@ -767,7 +767,7 @@ strategy :fixed_window, limit: 1000, window: 60, max_wait: 120
 Any method can be overridden; call `super` to keep the strategy's behaviour. State belongs in the limiter's mutex-guarded hash, never in instance variables, so a subclass stays thread-safe without doing anything: `state` returns a snapshot, `update_state` merges values, and `synchronize { |state| ... }` yields the live hash for read-modify-write sequences.
 
 ```ruby
-module Braze
+module CampaignApi
   class RateLimiter
     strategy :fixed_window, limit: 250_000, window: 3600, headers: true
 

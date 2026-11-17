@@ -118,7 +118,7 @@ WrapApi.configure do |config|
   config.logger = Logger.new(nil)
 end
 
-# An API that reports failures inside a 2xx body, Braze-style:
+# An API that reports failures inside a 2xx body:
 # { "message": "success" } or { "message": "...", "errors": [...] }.
 module BodyApi
   include Resteze
@@ -135,7 +135,7 @@ module BodyApi
     end
   end
 
-  # Braze-style: quota in X-RateLimit-* headers, retry a 429 twice.
+  # Quota in X-RateLimit-* headers, retry a 429 twice.
   class RateLimiter
     def before_request(*, **)
       synchronize { |state| state[:requests] = state.fetch(:requests, 0) + 1 }
