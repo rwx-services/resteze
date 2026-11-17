@@ -111,7 +111,8 @@ module Resteze
       end
 
       it "escapes path values as it escapes the id" do
-        assert_equal "/catalogs/a%2Fb/items/sku+1", Item.resource_path("sku 1", catalog_name: "a/b")
+        assert_equal "/catalogs/a%2Fb/items/sku%201", Item.resource_path("sku 1", catalog_name: "a/b")
+        assert_equal "/catalogs/red%20shoes/items", Item.resource_path(catalog_name: "red shoes")
       end
 
       it "raises InvalidRequestError naming a missing or blank value" do

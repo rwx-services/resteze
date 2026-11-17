@@ -84,7 +84,8 @@ module Resteze
       # The slug, or the filled path_template, followed by the id. Path
       # values are only accepted by a class that declares a path_template.
       def resource_path(id = nil, **path_params)
-        api_path([*resource_segments(path_params), id&.then { |part| CGI.escape(part.to_s) }].compact.join("/".freeze))
+        encoded_id = Resteze::Util.encode_path_segment(id) unless id.nil?
+        api_path([*resource_segments(path_params), encoded_id].compact.join("/".freeze))
       end
 
       # The id is positional, or the keywords themselves in the hash form

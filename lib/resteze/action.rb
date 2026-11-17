@@ -81,7 +81,7 @@ module Resteze
     end
 
     def path_segments
-      path.to_s.split("/").reject(&:blank?).map { |part| CGI.escape(part) }
+      path.to_s.split("/").reject(&:blank?).map { |part| Resteze::Util.encode_path_segment(part) }
     end
 
     # path_params fill the owner's path_template, when it declares one.

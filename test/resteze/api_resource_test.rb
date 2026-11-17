@@ -85,6 +85,7 @@ module Resteze
       it "should return resource path with an optional id" do
         assert_equal "/toy-service/v3/yo_yos/123", AcmeApi::YoYoA.resource_path(123)
         assert_equal "/toy-service/v3/yo_yos/a%7Cb", AcmeApi::YoYoA.resource_path("a|b")
+        assert_equal "/toy-service/v3/yo_yos/a%20b", AcmeApi::YoYoA.resource_path("a b")
       end
     end
 

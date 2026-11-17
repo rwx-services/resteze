@@ -123,13 +123,15 @@ module Resteze
 
       private
 
-      # The escaped path segments that precede the id.
+      # The encoded path segments that precede the id.
       def resource_segments(path_params)
         reject_unknown_keywords!(path_params.except(*self.path_params))
-        return [CGI.escape(resource_slug.to_s)] unless nested?
+        return [Resteze::Util.encode_path_segment(resource_slug)] unless nested?
 
         path_template_segments.map do |segment|
-          segment.is_a?(Symbol) ? CGI.escape(path_value!(segment, path_params[segment]).to_s) : segment
+          next segment unless segment.is_a?(Symbol)
+
+          Resteze::Util.encode_path_segment(path_value!(segment, path_params[segment]))
         end
       end
 

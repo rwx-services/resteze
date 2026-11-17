@@ -86,8 +86,9 @@ WidgetApi::Item.new("sku1", catalog_name: "shoes", values: { price: 12 }).save
 # => PUT /catalogs/shoes/items/sku1
 ```
 
-Path values are escaped the same way the id is, and they never appear in the
-query string or the request body.
+Path values are percent-encoded the same way the id is (`"red shoes"` is sent
+as `red%20shoes`), and they never appear in the query string or the request
+body.
 
 The hash form of `retrieve` works too. Path values are taken out first and the
 rest is the id and its extra params:

@@ -1,6 +1,7 @@
 # Dependencies
 require "action_dispatch/http/mime_type"
 require "active_support/all"
+require "erb"
 require "faraday"
 require "hashie"
 require "logger"
