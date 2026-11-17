@@ -143,6 +143,7 @@ end
 
 ## Documentation
 
+- [Building a Client](docs/BUILDING_A_CLIENT.md) — start here: what the API looks like, what to use, a complete client, and what not to do
 - [API](docs/API.md) — core concepts, resource definition, requests and responses
 - [Actions](docs/ACTIONS.md) — the `action` routing DSL for custom and re-routed endpoints
 - [Nested Resources](docs/NESTED_RESOURCES.md) — `path_template` for resources that live under a parent

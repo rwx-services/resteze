@@ -236,7 +236,7 @@ end
 
 ### Using Configuration Files
 
-```ruby
+```yaml
 # config/my_api.yml
 production:
   api_base: "https://api.example.com/"
