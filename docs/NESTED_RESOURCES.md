@@ -204,7 +204,8 @@ WidgetApi::Item.new("sku1").refresh
 # => WidgetApi::InvalidRequestError, param: "catalog_name"
 ```
 
-A blank value (`nil` or `""`) counts as missing.
+A blank value (`nil` or `""`) counts as missing. So does `"."` or `".."`, which a URL would
+resolve as a directory step out of the template's path.
 
 ## Testing
 

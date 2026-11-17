@@ -9,6 +9,7 @@ module Resteze
 
     RESERVED = %i[id params values parent].freeze
     TOKEN    = /\A:([a-z_][a-z0-9_]*)\z/
+    DOT_SEGMENTS = %w[. ..].freeze
 
     # Holds the generated readers. They sit behind the class's own methods,
     # so a property of the same name keeps its reader whichever is declared
@@ -126,8 +127,11 @@ module Resteze
         end
       end
 
+      # A value must be present and must not be a dot segment, which a URL
+      # resolves as "this directory" or "up one" and so would leave the
+      # template's path.
       def path_value!(token, value)
-        return value if value.present?
+        return value if value.present? && !DOT_SEGMENTS.include?(value.to_s)
 
         raise api_module::InvalidRequestError.new(
           "Could not determine which PATH to request: #{self} needs #{token}, got #{value.inspect}", token.to_s

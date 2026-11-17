@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `path_template` on `ApiResource` for nested resources: `path_template "catalogs/:catalog_name/items"` routes `retrieve`, `list`, `save`, `refresh` and every action under the filled template. Class methods take the tokens as keywords (`Item.list(catalog_name: "shoes")`), instances remember them (`item.catalog_name`, `item.path_params`), and a missing value raises `InvalidRequestError` naming it. See `docs/NESTED_RESOURCES.md`.
+- `path_template` on `ApiResource` for nested resources: `path_template "catalogs/:catalog_name/items"` routes `retrieve`, `list`, `save`, `refresh` and every action under the filled template. Class methods take the tokens as keywords (`Item.list(catalog_name: "shoes")`), instances remember them (`item.catalog_name`, `item.path_params`), and a missing value, or a `.` / `..` one, raises `InvalidRequestError` naming it. See `docs/NESTED_RESOURCES.md`.
 - `parent:` keyword on a templated resource's `list`, `retrieve`, `new` and action methods: a plain reference handed to every object the call builds, readable as `item.parent`.
 - `has_action ... path:` fills a nested resource's tokens with their upcased names (`/catalogs/CATALOG_NAME/items/ID`).
 

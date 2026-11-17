@@ -120,6 +120,15 @@ module Resteze
         end
       end
 
+      it "refuses a dot segment, which would climb out of the template" do
+        %w[. ..].each do |value|
+          error = assert_raises(NestApi::InvalidRequestError) { Item.resource_path("sku1", catalog_name: value) }
+
+          assert_equal "catalog_name", error.param
+        end
+        assert_equal "/catalogs/..a/items", Item.resource_path(catalog_name: "..a")
+      end
+
       it "rejects an unknown keyword" do
         assert_raises(ArgumentError) { Item.resource_path("sku1", catalog_name: "shoes", colour: "red") }
       end
