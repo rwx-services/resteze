@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.1]
+## [1.1.0]
 
 ### Added
 
@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 - `resource_path`, `Action#path_for`, `list`, `list_resource_path`, `retrieve`, `invoke_action` and `ApiResource#initialize` accept path values. Resources without a `path_template` behave as before, including overrides of these methods with their 1.0.0 signatures.
 - Ids, action path segments and path values are percent-encoded for a URL path (`ERB::Util.url_encode`) rather than form-encoded (`CGI.escape`). The visible difference is a space, which is now sent as `%20`: it was sent as `+`, which a server reads as a literal plus sign in a path.
+- An id of `.` or `..` raises `InvalidRequestError` before any request, as a path value does; so does a blank id passed to the class-level `resource_path`, which used to build a path with a trailing slash. A `.` or `..` segment in an action's `path:` or in a `path_template` raises `ArgumentError` at declaration.
 - `retrieve` with no arguments now raises `InvalidRequestError` (invalid ID) rather than `ArgumentError`.
 
 ### Fixed

@@ -67,6 +67,7 @@ These are rejected with an `ArgumentError` when the class is loaded:
 | `"a/:x/b/:x"` | A token is repeated. |
 | `"things/:id/parts"` | `id`, `params`, `values` and `parent` are reserved. |
 | `"catalogs/v:version/items"` | A token must be a whole segment. |
+| `"catalogs/../:name/items"` | A literal segment cannot be `.` or `..`. |
 | `"stores/:key/items"` | The reader `#key` would shadow an existing method. Resources are Hashes, so pick another name, such as `:store_key`. |
 
 ## Calling a nested resource
@@ -213,7 +214,8 @@ WidgetApi::Item.new("sku1").refresh
 ```
 
 A blank value (`nil` or `""`) counts as missing. So does `"."` or `".."`, which a URL would
-resolve as a directory step out of the template's path.
+resolve as a directory step out of the template's path. The id is held to the
+same rule.
 
 ## Testing
 

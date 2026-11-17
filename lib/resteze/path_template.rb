@@ -9,7 +9,6 @@ module Resteze
 
     RESERVED = %i[id params values parent].freeze
     TOKEN    = /\A:([a-z_][a-z0-9_]*)\z/
-    DOT_SEGMENTS = %w[. ..].freeze
 
     # Holds the generated readers. They sit behind the class's own methods,
     # so a property of the same name keeps its reader whichever is declared
@@ -137,11 +136,10 @@ module Resteze
         end
       end
 
-      # A value must be present and must not be a dot segment, which a URL
-      # resolves as "this directory" or "up one" and so would leave the
-      # template's path.
+      # A value that becomes a path segment, a token's or the id, must be
+      # present and must not be a dot segment.
       def path_value!(token, value)
-        return value if value.present? && !DOT_SEGMENTS.include?(value.to_s)
+        return value if value.present? && !Resteze::Util.dot_segment?(value)
 
         raise api_module::InvalidRequestError.new(
           "Could not determine which PATH to request: #{self} needs #{token}, got #{value.inspect}", token.to_s
@@ -153,14 +151,19 @@ module Resteze
         tokens   = segments.grep(Symbol)
         validate_path_tokens!(template, tokens)
 
-        @path_template = template
+        # Segments first: path_template_segments reads them once the
+        # template is set.
         @path_template_segments = segments.freeze
+        @path_template = template
         define_path_readers(tokens)
         nil
       end
 
       def parse_path_template(template)
         template.split("/").reject(&:blank?).map do |segment|
+          if Resteze::Util.dot_segment?(segment)
+            raise ArgumentError, "path_template #{template.inspect} has a #{segment.inspect} segment"
+          end
           next segment unless segment.include?(":")
 
           token = segment[TOKEN, 1] or
