@@ -34,7 +34,7 @@ module Resteze
     end
 
     def assign_path_context(path_params, parent = nil)
-      @path_params = (path_params || {}).slice(*self.class.path_params)
+      @path_params = (path_params || {}).slice(*self.class.path_tokens)
       @path_parent = parent
       self
     end
@@ -45,7 +45,7 @@ module Resteze
     # that names a property `path_params` still routes correctly.
     def routing_path_params
       given = @path_params || {}
-      self.class.path_params.to_h { |token| [token, given[token].presence || path_property(token)] }.compact.freeze
+      self.class.path_tokens.to_h { |token| [token, given[token].presence || path_property(token)] }.compact.freeze
     end
 
     # The keywords that carry this instance's path context to invoke_action:
@@ -72,8 +72,10 @@ module Resteze
         path_template.present?
       end
 
-      # The template's token names, in order.
-      def path_params
+      # The template's token names, in order: the keywords this class's
+      # methods take as path values, and the keys of an instance's
+      # #path_params.
+      def path_tokens
         path_template_segments.grep(Symbol)
       end
 
@@ -89,7 +91,7 @@ module Resteze
       def partition_path_keywords(keywords)
         return [{}, nil, keywords] unless nested?
 
-        tokens = path_params
+        tokens = path_tokens
         [keywords.slice(*tokens), keywords[:parent], keywords.except(*tokens, :parent)]
       end
 
@@ -125,7 +127,7 @@ module Resteze
 
       # The encoded path segments that precede the id.
       def resource_segments(path_params)
-        reject_unknown_keywords!(path_params.except(*self.path_params))
+        reject_unknown_keywords!(path_params.except(*path_tokens))
         return [Resteze::Util.encode_path_segment(resource_slug)] unless nested?
 
         path_template_segments.map do |segment|

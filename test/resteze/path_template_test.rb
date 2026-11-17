@@ -42,8 +42,8 @@ module Resteze
     describe ".path_template" do
       it "exposes the template and its tokens" do
         assert_equal "catalogs/:catalog_name/items", Item.path_template
-        assert_equal [:catalog_name], Item.path_params
-        assert_equal %i[catalog_name item_id], NestApi::Variant.path_params
+        assert_equal [:catalog_name], Item.path_tokens
+        assert_equal %i[catalog_name item_id], NestApi::Variant.path_tokens
         assert_predicate Item, :nested?
         assert_predicate NestApi::SaleItem, :nested?
         assert_predicate Item.new("sku1"), :nested?
@@ -51,18 +51,18 @@ module Resteze
 
       it "is absent on a plain resource" do
         assert_nil Catalog.path_template
-        assert_empty Catalog.path_params
+        assert_empty Catalog.path_tokens
         refute_predicate Catalog, :nested?
         refute_predicate Catalog.new, :nested?
       end
 
       it "is inherited and can be redeclared" do
-        assert_equal [:catalog_name], NestApi::SaleItem.path_params
+        assert_equal [:catalog_name], NestApi::SaleItem.path_tokens
 
         subclass = Class.new(Item) { path_template "shops/:shop_id/items" }
 
-        assert_equal [:shop_id], subclass.path_params
-        assert_equal [:catalog_name], Item.path_params
+        assert_equal [:shop_id], subclass.path_tokens
+        assert_equal [:catalog_name], Item.path_tokens
       end
 
       it "leaves resource_slug alone" do
