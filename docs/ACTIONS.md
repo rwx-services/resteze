@@ -315,6 +315,16 @@ describe MyApi::Campaign do
 end
 ```
 
+For a resource with a `path_template`, each token is filled with its upcased
+name: `"/catalogs/CATALOG_NAME/items/ID/archive"`.
+
+## Nested resources
+
+A resource that declares a `path_template` routes all of its actions under the
+filled template. The class forms of generated methods take the template's
+tokens as keywords; the instance form uses the values the instance remembers.
+See [NESTED_RESOURCES.md](NESTED_RESOURCES.md).
+
 ## The escape hatch
 
 Anything the DSL does not express is still one `request` call away, exactly as

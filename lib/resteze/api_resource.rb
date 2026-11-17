@@ -3,11 +3,15 @@ module Resteze
     extend ActiveSupport::Concern
     include Resteze::Request
     include Resteze::Actions
+    include Resteze::PathTemplate
 
-    def initialize(id = nil, values: {})
+    # Keywords other than values: are path context, accepted only by a class
+    # that declares a path_template: its tokens, and parent:.
+    def initialize(id = nil, values: {}, **path_context)
       super(values)
       id, @retrieve_params = util.normalize_id(id)
       self.id = id if self.class.property?(:id)
+      assign_path_context(*self.class.path_context!(path_context))
     end
 
     def resource_path
@@ -16,7 +20,7 @@ module Resteze
                                                   "invalid ID: #{id.inspect}", "id")
       end
 
-      self.class.resource_path(id)
+      self.class.resource_path(id, **routing_path_params)
     end
 
     # The path #refresh requests: the routed :retrieve action. Unlike
@@ -31,7 +35,7 @@ module Resteze
                                                   "invalid ID: #{id.inspect}", "id")
       end
 
-      retrieve_action.path_for(id)
+      retrieve_action.path_for(id, routing_path_params)
     end
 
     def retrieve_method
@@ -77,12 +81,24 @@ module Resteze
         api_module.default_resource_slug(self)
       end
 
-      def resource_path(id = nil)
-        api_path([resource_slug, id].compact.map { |part| CGI.escape(part.to_s) }.join("/".freeze))
+      # The slug, or the filled path_template, followed by the id. Path
+      # values are only accepted by a class that declares a path_template.
+      def resource_path(id = nil, **path_params)
+        api_path([*resource_segments(path_params), id&.then { |part| CGI.escape(part.to_s) }].compact.join("/".freeze))
       end
 
-      def retrieve(id)
-        new(id).refresh
+      # The id is positional, or the keywords themselves in the hash form
+      # (`retrieve(id: "abc", expand: true)`). A templated class takes its
+      # path values and parent: out of the keywords first.
+      def retrieve(id = nil, **keywords)
+        path_params, parent, rest = partition_path_keywords(keywords)
+        if id.nil?
+          id = rest
+        else
+          reject_unknown_keywords!(rest)
+        end
+
+        new(id).assign_path_context(path_params, parent).refresh
       end
     end
 

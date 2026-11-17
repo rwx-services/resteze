@@ -74,6 +74,10 @@ Both are opt-in; include them on a resource class when needed.
 
 Resolution is lazy. `Klass.actions` rebuilds a frozen hash of `Resteze::Action` value objects on every call by merging, lowest priority first: `Action::BUILT_IN` → the module's `action_defaults` → the module's `action` declarations → ancestor classes' `declared_actions` → the class's own. `refresh`, `list` and `save` consult the registry for their route (`retrieve_resource_path`, `list_resource_path`, `save_resource_path`, `save_params`) but keep their own bodies. Custom actions return `MyApi::Result` (a `Hashie::Mash`) unless `returns:` names `:self`, `:list` or an `Object` subclass. Declaration-time validation lives in `Resteze::Actions::Validation`. See `docs/ACTIONS.md`.
 
+### Nested resources: `path_template`
+
+`Resteze::PathTemplate` (mixed into `ApiResource`) lets a resource declare `path_template "catalogs/:catalog_name/items"`. `resource_path(id, **path_params)` fills it and `Action#path_for(id, path_params)` passes the values through, so every built-in and custom action nests. Class methods (`list`, `retrieve`, `new`, class forms of actions) take the tokens and an optional `parent:` as keywords via `partition_path_keywords` / `path_context!`; instances hold them outside the properties (`path_params`, `path_parent`, generated readers) and objects built by a call get them through `apply_path_context`. The instance form of a member action treats every keyword as a request param. There is no association layer. See `docs/NESTED_RESOURCES.md`.
+
 ### Testing helpers
 
 `lib/resteze/testing/` provides helpers for consumers testing their own gem:

@@ -145,6 +145,7 @@ end
 
 - [API](docs/API.md) — core concepts, resource definition, requests and responses
 - [Actions](docs/ACTIONS.md) — the `action` routing DSL for custom and re-routed endpoints
+- [Nested Resources](docs/NESTED_RESOURCES.md) — `path_template` for resources that live under a parent
 - [Advanced Usage](docs/ADVANCED_USAGE.md) — lists, saves, pagination, batching and caching patterns
 - [Configuration](docs/CONFIGURATION.md) — module configuration, connections and middleware
 - [Error Handling](docs/ERROR_HANDLING.md) — the namespaced error hierarchy and recovery

@@ -52,7 +52,8 @@ module Resteze
         end
 
         def assert_action_path(action, path)
-          actual = action.member? ? action.path_for("ID") : action.path_for
+          tokens = subject.path_params.index_with { |token| token.to_s.upcase }
+          actual = action.path_for(("ID" if action.member?), tokens)
 
           expect(actual).to eq(path), "Expected #{subject} action #{action.name} to route to #{path}"
         end

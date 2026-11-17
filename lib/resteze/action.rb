@@ -84,8 +84,9 @@ module Resteze
       path.to_s.split("/").reject(&:blank?).map { |part| CGI.escape(part) }
     end
 
-    def path_for(id = nil)
-      base = member? && self.id == :path ? owner.resource_path(id) : owner.resource_path
+    # path_params fill the owner's path_template, when it declares one.
+    def path_for(id = nil, path_params = {})
+      base = member? && self.id == :path ? owner.resource_path(id, **path_params) : owner.resource_path(**path_params)
       [base, *path_segments].join("/").squeeze("/")
     end
 

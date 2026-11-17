@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1]
+
+### Added
+
+- `path_template` on `ApiResource` for nested resources: `path_template "catalogs/:catalog_name/items"` routes `retrieve`, `list`, `save`, `refresh` and every action under the filled template. Class methods take the tokens as keywords (`Item.list(catalog_name: "shoes")`), instances remember them (`item.catalog_name`, `item.path_params`), and a missing value raises `InvalidRequestError` naming it. See `docs/NESTED_RESOURCES.md`.
+- `parent:` keyword on a templated resource's `list`, `retrieve`, `new` and action methods: a plain reference handed to every object the call builds, readable as `item.parent`.
+- `has_action ... path:` fills a nested resource's tokens with their upcased names (`/catalogs/CATALOG_NAME/items/ID`).
+
+### Changed
+
+- `resource_path`, `Action#path_for`, `list`, `list_resource_path`, `retrieve`, `invoke_action` and `ApiResource#initialize` accept path values. Resources without a `path_template` behave as before, including overrides of these methods with their 1.0.0 signatures.
+- `retrieve` with no arguments now raises `InvalidRequestError` (invalid ID) rather than `ArgumentError`.
+
 ## [1.0.0]
 
 The release developed as 0.5.0, renumbered: it is the first stable release, and the error hierarchy change under **Changed** breaks code written against the Faraday-derived classes.
