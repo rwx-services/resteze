@@ -370,6 +370,12 @@ module Resteze
         assert_requested stub
       end
 
+      it "raises on a blank id when destroy is re-routed" do
+        error = assert_raises(NestApi::InvalidRequestError) { NestApi::Relic.new(catalog_name: "shoes").destroy }
+
+        assert_equal "id", error.param
+      end
+
       it "raises before any request when a value is missing" do
         error = assert_raises(NestApi::InvalidRequestError) { Item.destroy("sku1") }
 
