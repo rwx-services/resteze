@@ -9,8 +9,8 @@ POST /catalogs/:catalog_name/items/:id/archive
 ```
 
 Declare the path once with `path_template`. `retrieve`, `list`, `save`,
-`refresh` and every custom action then route under it, with nothing to
-override.
+`destroy`, `refresh` and every custom action then route under it, with nothing
+to override.
 
 ```ruby
 module WidgetApi
@@ -85,6 +85,9 @@ WidgetApi::Item.new(catalog_name: "shoes", values: { price: 10 }).save
 
 WidgetApi::Item.new("sku1", catalog_name: "shoes", values: { price: 12 }).save
 # => PUT /catalogs/shoes/items/sku1
+
+WidgetApi::Item.destroy("sku1", catalog_name: "shoes")   # with `include Destroy`
+# => DELETE /catalogs/shoes/items/sku1
 ```
 
 Path values are percent-encoded the same way the id is (`"red shoes"` is sent
@@ -116,6 +119,7 @@ item.catalog_name   # => "shoes"
 item.path_params    # => { catalog_name: "shoes" }  (frozen)
 item.refresh        # => GET /catalogs/shoes/items/sku1
 item.save           # => PUT /catalogs/shoes/items/sku1
+item.destroy        # => DELETE /catalogs/shoes/items/sku1
 ```
 
 - Items in a list get the path values of the `list` call that produced them.
@@ -185,8 +189,8 @@ end
 catalog.items.first.parent.equal?(catalog)   # => true
 ```
 
-- `parent:` is accepted wherever path values are: `list`, `retrieve`, `new`
-  and the class forms of actions.
+- `parent:` is accepted wherever path values are: `list`, `retrieve`, `new`,
+  `destroy` and the class forms of actions.
 - It travels with the path values: every item in a list gets it, and it
   survives `refresh` and `save`.
 - It is only a reference. Resteze never fetches it, never serializes it, and

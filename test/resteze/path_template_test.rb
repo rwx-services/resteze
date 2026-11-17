@@ -18,6 +18,17 @@ module Resteze
       property :id
       property :path_params
     end
+
+    # A nested resource whose delete is a verb-addressed POST.
+    class NestApi::Relic < NestApi::Item
+      action :destroy, path: "delete", id: :param, method: :post
+    end
+
+    class AcmeApi::Trinket < AcmeApi::ApiResource
+      include AcmeApi::Destroy
+
+      property :id
+    end
     # rubocop:enable Style/ClassAndModuleChildren
 
     Item    = NestApi::Item
@@ -330,6 +341,50 @@ module Resteze
         Item.list(catalog_name: "shoes").first.save
 
         assert_requested stub
+      end
+    end
+
+    describe "#destroy" do
+      it "deletes the nested member" do
+        stub = stub_request(:delete, nest_url("/catalogs/shoes/items/sku1")).to_return(status: 204)
+
+        Item.new("sku1", catalog_name: "shoes").destroy
+
+        assert_requested stub
+      end
+
+      it "takes path values in the class form" do
+        stub = stub_request(:delete, nest_url("/catalogs/shoes/items/sku1")).to_return(status: 204)
+
+        Item.destroy("sku1", catalog_name: "shoes", parent: Catalog.new)
+
+        assert_requested stub
+      end
+
+      it "nests a re-routed destroy that carries the id as a param" do
+        stub = stub_request(:post, nest_url("/catalogs/shoes/items/delete"))
+               .with(body: { relic_id: "sku1" }).to_return(json(message: "ok"))
+
+        NestApi::Relic.destroy("sku1", catalog_name: "shoes")
+
+        assert_requested stub
+      end
+
+      it "raises on a blank id when destroy is re-routed" do
+        error = assert_raises(NestApi::InvalidRequestError) { NestApi::Relic.new(catalog_name: "shoes").destroy }
+
+        assert_equal "id", error.param
+      end
+
+      it "raises before any request when a value is missing" do
+        error = assert_raises(NestApi::InvalidRequestError) { Item.destroy("sku1") }
+
+        assert_equal "catalog_name", error.param
+      end
+
+      it "rejects an unknown keyword, on a plain resource too" do
+        assert_raises(ArgumentError) { Item.destroy("sku1", catalog_name: "shoes", colour: "red") }
+        assert_raises(ArgumentError) { AcmeApi::Trinket.destroy("t1", catalog_name: "shoes") }
       end
     end
 

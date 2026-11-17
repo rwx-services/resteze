@@ -3,6 +3,7 @@
 ## Table of Contents
 - [List Operations](#list-operations)
 - [Save Operations](#save-operations)
+- [Destroy Operations](#destroy-operations)
 - [Error Handling](#error-handling)
 - [Pagination](#pagination)
 - [Batch Operations](#batch-operations)
@@ -225,6 +226,60 @@ customers = MyApi::Customer.create_batch([
   { email: 'user2@example.com', name: 'User 2' }
 ])
 ```
+
+## Destroy Operations
+
+### Including the Destroy Module
+
+```ruby
+module MyApi
+  class Customer < ApiResource
+    include Destroy
+
+    property :id
+    property :email
+  end
+end
+```
+
+### Deleting a Record
+
+```ruby
+customer = MyApi::Customer.retrieve('123')
+customer.destroy              # DELETE /customers/123
+
+MyApi::Customer.destroy('123') # same request, without retrieving first
+```
+
+`destroy` returns a `MyApi::Result` built from the response body, which is empty
+for a `204 No Content`. A blank id raises `MyApi::InvalidRequestError` before any
+request is sent.
+
+### Custom Destroy Behavior
+
+```ruby
+module MyApi
+  class Customer < ApiResource
+    include Destroy
+
+    property :id
+
+    # Send a reason with the request
+    def destroy_params
+      super.merge(reason: 'customer request')
+    end
+
+    # Return the receiver instead of a Result
+    def process_destroy_response(_response)
+      self
+    end
+  end
+end
+```
+
+`destroy_headers` defaults to `retrieve_headers` when defined. The route comes
+from the built-in `destroy` action and can be re-routed like the others; see
+[docs/ACTIONS.md](ACTIONS.md).
 
 ## Error Handling
 

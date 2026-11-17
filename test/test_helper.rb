@@ -48,6 +48,7 @@ module VerbApi
   action :create,   path: "create"
   action :update,   path: "update", method: :post
   action :export,   method: :post
+  action :destroy,  path: "delete", method: :post
 
   def self.default_list_key(klass)
     klass.resource_slug.to_sym
@@ -60,6 +61,7 @@ module VerbApi
 
   class Campaign < ApiResource
     include List
+    include Destroy
 
     property :id
     property :name
@@ -131,6 +133,7 @@ module NestApi
   class Item < ApiResource
     include List
     include Save
+    include Destroy
 
     property :id
     property :price

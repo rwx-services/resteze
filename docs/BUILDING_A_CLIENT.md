@@ -24,7 +24,7 @@ Answer these about the API. Each answer picks a feature in the next section.
    endpoints named by verb (`/widgets/details?widget_id=42`)?
 2. **Does any resource live under another?** For example
    `/catalogs/shoes/items`.
-3. **Which operations exist beyond read, list, create and update?**
+3. **Which operations exist beyond read, list, create, update and delete?**
 4. **What does a list response look like?** Which key holds the items, and
    what else comes back beside them?
 5. **Are single records wrapped in an envelope**, such as `{ "widget": {...} }`?
@@ -45,9 +45,10 @@ Answer these about the API. Each answer picks a feature in the next section.
 | has a path prefix or a version segment | `default_service_path(klass)` and `default_api_version(klass)` on the module | [API.md](API.md) |
 | has a list endpoint | `include List` on the resource | [ADVANCED_USAGE.md](ADVANCED_USAGE.md) |
 | creates and updates records | `include Save` on the resource | [ADVANCED_USAGE.md](ADVANCED_USAGE.md) |
+| deletes records | `include Destroy` on the resource | [ADVANCED_USAGE.md](ADVANCED_USAGE.md) |
 | returns list items under a key other than `data` | `def self.list_key` on the resource, or `default_list_key(klass)` on the module | [API.md](API.md) |
 | wraps a single record in an envelope | `def self.object_key` on the resource, or `default_object_key(klass)` on the module | [API.md](API.md) |
-| has an operation beyond the standard four | `action :name, method: :post` (add `on: :member` when it acts on one record) | [ACTIONS.md](ACTIONS.md) |
+| has an operation beyond the standard five | `action :name, method: :post` (add `on: :member` when it acts on one record) | [ACTIONS.md](ACTIONS.md) |
 | addresses the standard operations by verb, or sends the id as a param | Re-route them: `action :retrieve, path: "details", id: :param`. Set it once for every resource with module-level `action` and `action_defaults` | [ACTIONS.md](ACTIONS.md) |
 | nests a resource under a parent | `path_template "catalogs/:catalog_name/items"` | [NESTED_RESOURCES.md](NESTED_RESOURCES.md) |
 | authenticates with a key, Basic, a bearer token or a client certificate | `authenticate_with :api_key`, `:basic`, `:bearer` or `:mtls` on the module | [CONFIGURATION.md](CONFIGURATION.md#authentication) |
@@ -94,10 +95,12 @@ module WidgetApi
   end
 
   # A plain REST resource: nothing to route.
-  #   GET /widgets, GET /widgets/42, POST /widgets, PUT /widgets/42
+  #   GET /widgets, GET /widgets/42, POST /widgets, PUT /widgets/42,
+  #   DELETE /widgets/42
   class Widget < ApiResource
     include List
     include Save
+    include Destroy
 
     property :id
     property :name
@@ -155,6 +158,7 @@ widget = WidgetApi::Widget.retrieve(42)
 widget.name = "Large sprocket"
 widget.save
 widget.archive
+widget.destroy
 
 WidgetApi::Widget.list(params: { page: 2 })
 WidgetApi::Widget.search(q: "sprocket")
