@@ -2,6 +2,8 @@ module Resteze
   module Util
     extend ActiveSupport::Concern
 
+    DOT_SEGMENTS = %w[. ..].freeze
+
     module ClassMethods
       def convert_to_object(data, object_class)
         case data
@@ -19,6 +21,12 @@ module Resteze
       # CGI.escape would write a "+" that a server reads literally in a path.
       def encode_path_segment(value)
         ERB::Util.url_encode(value.to_s)
+      end
+
+      # True for "." and "..", which a URL resolves as "this directory" and
+      # "up one": as a path segment either would leave the intended path.
+      def dot_segment?(value)
+        DOT_SEGMENTS.include?(value.to_s)
       end
 
       def normalize_headers(headers)

@@ -24,9 +24,16 @@ module Resteze
 
       validate_option_value!(name, options, :on, ON_VALUES)
       validate_option_value!(name, options, :id, ID_VALUES)
+      validate_path!(name, options[:path])
       return unless RESERVED.include?(name) && options.key?(:on)
 
       raise ArgumentError, "on: cannot be changed for the built-in action :#{name}"
+    end
+
+    def self.validate_path!(name, path)
+      return unless path.to_s.split("/").any? { |segment| Resteze::Util.dot_segment?(segment) }
+
+      raise ArgumentError, "path: cannot contain a . or .. segment (action :#{name})"
     end
 
     def self.validate_option_value!(name, options, key, values)

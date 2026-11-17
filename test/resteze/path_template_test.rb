@@ -103,6 +103,11 @@ module Resteze
         assert_raises(ArgumentError) { declare("catalogs/:Bad-Name/items") }
       end
 
+      it "rejects a literal dot segment" do
+        assert_raises(ArgumentError) { declare("catalogs/../:catalog_name/items") }
+        assert_raises(ArgumentError) { declare("./:catalog_name/items") }
+      end
+
       it "rejects a token whose reader would shadow an existing method" do
         error = assert_raises(ArgumentError) { declare("stores/:key/items") }
 
@@ -142,6 +147,8 @@ module Resteze
           assert_equal "catalog_name", error.param
         end
         assert_equal "/catalogs/..a/items", Item.resource_path(catalog_name: "..a")
+        assert_raises(NestApi::InvalidRequestError) { Item.retrieve("..", catalog_name: "shoes") }
+        assert_raises(NestApi::InvalidRequestError) { Item.new(".", catalog_name: "shoes").refresh }
       end
 
       it "rejects an unknown keyword" do

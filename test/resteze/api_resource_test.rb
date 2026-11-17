@@ -87,6 +87,21 @@ module Resteze
         assert_equal "/toy-service/v3/yo_yos/a%7Cb", AcmeApi::YoYoA.resource_path("a|b")
         assert_equal "/toy-service/v3/yo_yos/a%20b", AcmeApi::YoYoA.resource_path("a b")
       end
+
+      it "refuses an id that is blank or a dot segment" do
+        ["", " ", ".", ".."].each do |id|
+          error = assert_raises(::AcmeApi::InvalidRequestError) { ::AcmeApi::Widget.resource_path(id) }
+
+          assert_equal "id", error.param
+        end
+        assert_equal "/widgets/..a", ::AcmeApi::Widget.resource_path("..a")
+        assert_equal "/widgets/0", ::AcmeApi::Widget.resource_path(0)
+      end
+
+      it "refuses a dot-segment id before any request" do
+        assert_raises(::AcmeApi::InvalidRequestError) { ::AcmeApi::Widget.retrieve("..") }
+        assert_raises(::AcmeApi::InvalidRequestError) { ::AcmeApi::Widget.retrieve(".") }
+      end
     end
 
     describe "#initialize" do

@@ -83,8 +83,10 @@ module Resteze
 
       # The slug, or the filled path_template, followed by the id. Path
       # values are only accepted by a class that declares a path_template.
+      # An id that is blank, "." or ".." raises InvalidRequestError; pass no
+      # id for the collection path.
       def resource_path(id = nil, **path_params)
-        encoded_id = Resteze::Util.encode_path_segment(id) unless id.nil?
+        encoded_id = Resteze::Util.encode_path_segment(path_value!(:id, id)) unless id.nil?
         api_path([*resource_segments(path_params), encoded_id].compact.join("/".freeze))
       end
 

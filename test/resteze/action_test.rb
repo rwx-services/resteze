@@ -95,6 +95,16 @@ module Resteze
         assert_equal ["by%20name"], action(:by_name, method: :get, path: "by name").path_segments
       end
 
+      it "rejects a dot segment in path: at declaration" do
+        ["..", "../other", "export/./ids", "."].each do |path|
+          error = assert_raises(ArgumentError) { Resteze::Action.validate_options!(:export, { path: path }) }
+
+          assert_match(/path:/, error.message)
+        end
+        Resteze::Action.validate_options!(:export, { path: "export/ids.csv" })
+        Resteze::Action.validate_options!(:export, { path: nil })
+      end
+
       it "honors a resource_path override" do
         assert_equal "/gizmos/list", action(:list, AcmeApi::GizmoDevice, method: :get, path: "list").path_for
       end
