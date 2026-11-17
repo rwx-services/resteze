@@ -147,8 +147,8 @@ Custom actions nest like the built-ins, including re-routed ones and those
 that carry the id as a param.
 
 ```ruby
-WidgetApi::Item.bulk_update(catalog_name: "shoes", items: [...])
-# => POST /catalogs/shoes/items/bulk_update     body: {"items":[...]}
+WidgetApi::Item.bulk_update(catalog_name: "shoes", items: [{ id: "sku1", price: 9 }])
+# => POST /catalogs/shoes/items/bulk_update     body: {"items":[{"id":"sku1","price":9}]}
 
 WidgetApi::Item.archive("sku1", catalog_name: "shoes", reason: "old")
 # => POST /catalogs/shoes/items/sku1/archive    body: {"reason":"old"}

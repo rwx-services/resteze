@@ -216,7 +216,7 @@ class User < ApiResource
   action :track, method: :post
 end
 
-result = MyApi::User.track(events: [...])
+result = MyApi::User.track(events: [{ name: "signup" }])
 result.message                    # => "success"
 result.events_processed           # => 2
 result.http_response.http_status  # => 200
